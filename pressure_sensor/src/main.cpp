@@ -83,7 +83,7 @@ void setup() {
   pinMode(SCK, OUTPUT);
   pinMode(DT, INPUT);
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   // Optional: wait for Serial on boards like Leonardo
   while (!Serial) { }
 
@@ -167,5 +167,5 @@ void loop() {
   Serial.print(weight_g, 1);
   Serial.println(" g");
 
-  delay(500);
+  delay(50);
 }
