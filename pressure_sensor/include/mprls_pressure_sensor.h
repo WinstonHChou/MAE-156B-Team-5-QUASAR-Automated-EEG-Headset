@@ -44,6 +44,7 @@ uint8_t tcaselectValidPorts(uint8_t mux = DEFAULT_TCAADDR) {
   uint8_t found_ports = 0x00;
   for (uint8_t i = TCA9548A_MIN_CHANNEL; i <= TCA9548A_MAX_CHANNEL; i++) {
     int res = tcaselect(i, mux);
+    // TODO: consider logging after finishing all channels instead of per-channel
     if (res != 0) {
       Serial.print("TCASELECT Error Code ");
       Serial.print(res);
