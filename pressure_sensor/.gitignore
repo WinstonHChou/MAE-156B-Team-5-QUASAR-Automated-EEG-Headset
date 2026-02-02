@@ -36,3 +36,6 @@
 
 # platformpio
 .pio/
+
+# logs
+mprls_log*.csv
