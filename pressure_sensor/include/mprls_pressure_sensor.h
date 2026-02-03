@@ -5,6 +5,19 @@
 #define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
 #define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
 
+#define MPRLS_SAMPLING_RATE_MS 10  // delay between pressure reads
+
+// Physical constants
+#define GRAVITY 9.80665f                              // m/s^2
+#define KPA_TO_PSI(x) ((x) / 6.8947572932f)           // 1 PSI = 6.8947572932 kPa
+#define HPA_TO_KPA(x) ((x) / 10.0f)                   // 1 hPa = 0.1 kPa
+#define GRAM_TO_NEWTON(x) ((x) / 1000.0f * GRAVITY)   // convert grams to Newtons
+#define NEWTON_TO_GRAM(x) ((x) * 1000.0f / GRAVITY) // convert Newtons to grams
+#define PA_TO_KPA(x) ((x) / 1000.0f)                  // 1 Pa = 0.001 kPa
+
+// Calibration Coefficients
+#define FORCE_TO_SENSOR_RATIO 56.436f  // N/kPa, calibrated on 2026/02/02
+
 // future multi-mux support:
 // for (uint8_t mux = 0x70; mux <= 0x77; ++mux) {
 //   for (uint8_t ch = 0; ch < 8; ++ch) {
