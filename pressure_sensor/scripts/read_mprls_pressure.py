@@ -75,13 +75,13 @@ def main(no_plot=False):
                     continue
 
                 if raw.startswith(KEY):
-                    m = re.search(r"Pressure_kPa:([-+]?\d*\.?\d+)", raw)
+                    m = re.search(r"Pressure_kPa_0:([-+]?\d*\.?\d+)", raw)
                     # allow lines that include pressure but maybe also other fields
                     if not m:
                         continue
 
                     # optional weight field
-                    mw = re.search(r"Detected_weight_g:([-+]?\d*\.?\d+)", raw)
+                    mw = re.search(r"Detected_weight_g_0:([-+]?\d*\.?\d+)", raw)
 
                     t_unix = time.time()
                     elapsed = t_unix - t0

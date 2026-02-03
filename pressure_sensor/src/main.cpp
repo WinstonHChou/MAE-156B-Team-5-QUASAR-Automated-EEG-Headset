@@ -6,7 +6,7 @@
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
 
 // // ---- Calibration variables ----
-float pressureZero_kPa        = 0.0f;             // raw counts at zero weight
+float pressureZero_kPa[8];             // raw counts at zero weight
 // float pressureCali_kPa        = 0.0f;             // raw counts at known weight
 // float forceToSensorRatio      = 0.0f;             // slope: Pa per ADC count
 // float calibrationWeight_g     = 0.0f;             // known mass in grams
@@ -56,7 +56,7 @@ void setup() {
     Serial.println("Press Enter in the Serial Monitor when ready.");
     // waitForEnter();
 
-    pressureZero_kPa = HPA_TO_KPA(mpr.readPressure());
+    pressureZero_kPa[ch] = HPA_TO_KPA(mpr.readPressure());
     // Serial.print("pressureZero_kPa = ");
     // Serial.println(pressureZero_kPa, 1);
     // ------------------------------------
@@ -117,14 +117,14 @@ void loop() {
     Serial.print(">");
   
     float pressure_kPa = HPA_TO_KPA(mpr.readPressure());
-    Serial.print("Pressure_kPa:"); Serial.print(pressure_kPa);
-    Serial.print(",Pressure_PSI:"); Serial.print(KPA_TO_PSI(pressure_kPa));
+    Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
+    Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
 
     // Gauge pressure relative to zero-load
-    float F_g = (pressure_kPa - pressureZero_kPa) * FORCE_TO_SENSOR_RATIO;
+    float F_g = (pressure_kPa - pressureZero_kPa[ch]) * FORCE_TO_SENSOR_RATIO;
 
     // Serial Logging
-    Serial.print(",Detected_weight_g:");
+    Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":");
     Serial.print(F_g, 1);
     Serial.println();
 
