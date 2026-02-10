@@ -1,7 +1,7 @@
 #include <unity.h>
 #include "mprls_pressure_sensor.h"
 
-#define TEST_DURATION_MS 100000
+#define TEST_DURATION_MS 1000
 
 // Sensor object
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
@@ -15,7 +15,7 @@ void test_mprls0025_pressure(void) {
     int res = tcaselect(i);
     TEST_ASSERT_EQUAL(0, res); // expect success (0) when TCA present/responding
 
-    Wire.beginTransmission(MPRLS_DEFAULT_ADDR);
+    Wire.beginTransmission(MPRLS_ADDR);
     if (!Wire.endTransmission()) {
       TEST_MESSAGE("TCA Port #");
       char buf[4];
@@ -23,10 +23,10 @@ void test_mprls0025_pressure(void) {
       TEST_MESSAGE(buf);
       TEST_MESSAGE("Found MPRLS at address 0x");
       char addr_buf[4];
-      snprintf(addr_buf, sizeof(addr_buf), "%02X", MPRLS_DEFAULT_ADDR);
+      snprintf(addr_buf, sizeof(addr_buf), "%02X", MPRLS_ADDR);
       TEST_MESSAGE(addr_buf);
 
-      bool begun = mpr.begin(MPRLS_DEFAULT_ADDR);
+      bool begun = mpr.begin(MPRLS_ADDR);
       TEST_ASSERT_TRUE(begun);
 
       while (millis() - start_time < TEST_DURATION_MS) {
@@ -50,7 +50,7 @@ void test_mprls0025_pressure(void) {
 //     int res = tcaselect(i);
 //     TEST_ASSERT_EQUAL(0, res); // expect success (0) when TCA present/responding
 
-//     Wire.beginTransmission(MPRLS_DEFAULT_ADDR);
+//     Wire.beginTransmission(MPRLS_ADDR);
 //     if (!Wire.endTransmission()) {
 //       TEST_MESSAGE("TCA Port #");
 //       char buf[4];
@@ -58,10 +58,10 @@ void test_mprls0025_pressure(void) {
 //       TEST_MESSAGE(buf);
 //       TEST_MESSAGE("Found MPRLS at address 0x");
 //       char addr_buf[4];
-//       snprintf(addr_buf, sizeof(addr_buf), "%02X", MPRLS_DEFAULT_ADDR);
+//       snprintf(addr_buf, sizeof(addr_buf), "%02X", MPRLS_ADDR);
 //       TEST_MESSAGE(addr_buf);
 
-//       bool begun = mpr.begin(MPRLS_DEFAULT_ADDR);
+//       bool begun = mpr.begin(MPRLS_ADDR);
 //       TEST_ASSERT_TRUE(begun);
 
 //       while (millis() - start_time < TEST_DURATION_MS) {

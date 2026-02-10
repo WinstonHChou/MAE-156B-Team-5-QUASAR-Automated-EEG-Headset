@@ -4,6 +4,7 @@
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
 #define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
 #define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
+#define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 
 #define MPRLS_SAMPLING_RATE_MS 10  // delay between pressure reads
 
@@ -34,7 +35,7 @@
  *
  * Probes each channel in the range [TCA9548A_MIN_CHANNEL, TCA9548A_MAX_CHANNEL] on the given
  * multiplexer I2C address by selecting the channel (tcaselect) and attempting an I2C transmission
- * to MPRLS_DEFAULT_ADDR. If the probe succeeds (Wire.endTransmission() == 0) the corresponding
+ * to MPRLS_ADDR. If the probe succeeds (Wire.endTransmission() == 0) the corresponding
  * bit for that channel is set in the returned mask.
  *
  * Side effects:
@@ -50,7 +51,7 @@
  *
  * Notes:
  *  - Assumes channel indices fit in the return byte (typical TCA9548A channels 0..7).
- *  - Relies on the constants TCA9548A_MIN_CHANNEL, TCA9548A_MAX_CHANNEL, and MPRLS_DEFAULT_ADDR.
+ *  - Relies on the constants TCA9548A_MIN_CHANNEL, TCA9548A_MAX_CHANNEL, and MPRLS_ADDR.
  *  - Not reentrant/thread-safe.
  */
 uint8_t tcaselectValidPorts(uint8_t mux = DEFAULT_TCAADDR) {
@@ -68,7 +69,7 @@ uint8_t tcaselectValidPorts(uint8_t mux = DEFAULT_TCAADDR) {
       continue; // no mux/device there
     }
 
-    Wire.beginTransmission(MPRLS_DEFAULT_ADDR);
+    Wire.beginTransmission(MPRLS_ADDR);
     if (!Wire.endTransmission()) {
       found_ports |= (1 << i);
     }
