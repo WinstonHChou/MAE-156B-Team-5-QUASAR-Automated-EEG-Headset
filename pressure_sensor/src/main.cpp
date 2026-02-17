@@ -1,225 +1,133 @@
-// #include <Arduino.h>
+#include "mprls_pressure_sensor.h"
 
-// // HX710B Air Pressure Sensor with Arduino 
-// // Pin connections:
-// // HX710B DT  -> Arduino pin 2
-// // HX710B SCK -> Arduino pin 3
-// // VCC -> 3.3V or 5V (check your module specs)
-// // GND -> GND
+#define MUX_ADDR DEFAULT_TCAADDR
 
-// #define DT  2
-// #define SCK 3
-
-// // ---- Physical constants ----
-// const float GRAVITY = 9.80665;   // m/s^2
-
-// // EFFECTIVE BELLOWS AREA IN m^2
-// // Example: 1 cm^2  =>  1e-4 m^2
-// //          d = 10 mm => A ≈ 7.85e-5 m^2
-// // >>> CHANGE THIS TO YOUR REAL BELLOWS AREA <<<
-// const float BELLOWS_AREA_M2 = 1.44e-4;
-
-// // ---- Calibration variables ----
-// float rawZero = 0.0;                    // raw counts at zero weight
-// float rawCal  = 0.0;                    // raw counts at known weight
-// float rawToPressure_PaPerCount = 0.0;   // slope: Pa per ADC count
-// float calibrationWeight_g = 0.0;        // known mass in grams
-
-// // ----------- HX710B read function -----------
-// long readHX710B() {
-//   long count = 0;
-//   unsigned long start = micros();
-
-//   // Wait for data ready (DT goes LOW)
-//   while (digitalRead(DT)) {
-//     if (micros() - start > 1000000) return -1; // timeout after ~1s
-//   }
-
-//   // Read 24 bits of data
-//   for (int i = 0; i < 24; i++) {
-//     digitalWrite(SCK, HIGH);
-//     delayMicroseconds(1);
-//     count = count << 1;
-//     digitalWrite(SCK, LOW);
-//     delayMicroseconds(1);
-//     if (digitalRead(DT)) count++;
-//   }
-
-//   // Extra clock pulse to set gain/channel
-//   digitalWrite(SCK, HIGH);
-//   delayMicroseconds(1);
-//   digitalWrite(SCK, LOW);
-
-//   // Convert to signed 24-bit
-//   if (count & 0x800000) count |= ~0xFFFFFF;
-
-//   return count;
-// }
-
-// // Average N valid readings from HX710B
-// long readAverageHX710B(int samples) {
-//   long sum = 0;
-//   int valid = 0;
-
-//   while (valid < samples) {
-//     long val = readHX710B();
-//     if (val != -1) {
-//       sum += val;
-//       valid++;
-//     }
-//     // if val == -1, try again (timeout)
-//   }
-
-//   return sum / samples;
-// }
-
-// // Wait for user to hit Enter in Serial Monitor
-// void waitForEnter() {
-//   while (!Serial.available()) { }
-//   while (Serial.available()) { Serial.read(); } // clear buffer
-// }
-
-// void setup() {
-//   pinMode(SCK, OUTPUT);
-//   pinMode(DT, INPUT);
-
-//   Serial.begin(115200);
-//   // Optional: wait for Serial on boards like Leonardo
-//   while (!Serial) { }
-
-//   Serial.println(F("HX710B Bellow Calibration Demo"));
-//   Serial.println(F("--------------------------------"));
-
-//   // ---- Step 1: zero-load baseline ----
-//   Serial.println(F("\nStep 1: ZERO LOAD"));
-//   Serial.println(F("Make sure there is NO weight on the bellow."));
-//   Serial.println(F("Press Enter in the Serial Monitor when ready."));
-//   waitForEnter();
-
-//   rawZero = (float)readAverageHX710B(50);  // average of 50 samples
-//   Serial.print(F("rawZero = "));
-//   Serial.println(rawZero, 1);
-
-//   // ---- Step 2: known weight calibration ----
-//   Serial.println(F("\nStep 2: KNOWN WEIGHT"));
-//   Serial.println(F("Place a known weight on the bellow and leave it there."));
-//   Serial.println(F("Now type that weight in GRAMS (e.g. 100) and press Enter:"));
-
-//   while (!Serial.available()) { }
-//   calibrationWeight_g = Serial.parseFloat();
-//   while (Serial.available()) { Serial.read(); }  // clear rest of line
-
-//   Serial.print(F("Calibration weight = "));
-//   Serial.print(calibrationWeight_g, 2);
-//   Serial.println(F(" g"));
-
-//   delay(1000); // let the system settle with the weight applied
-
-//   rawCal = (float)readAverageHX710B(50);  // average of 50 samples
-//   Serial.print(F("rawCal = "));
-//   Serial.println(rawCal, 1);
-
-//   float deltaRaw = rawCal - rawZero;
-//   if (deltaRaw == 0.0f) {
-//     Serial.println(F("ERROR: deltaRaw is zero. Check sensor / wiring / weight."));
-//     rawToPressure_PaPerCount = 0.0f;
-//   } else {
-//     // F = m * g  (N)
-//     float weight_kg = calibrationWeight_g / 1000.0f;
-//     float F_N = weight_kg * GRAVITY;
-
-//     // F = ΔP * A  =>  ΔP = F / A
-//     float deltaP_Pa = F_N / BELLOWS_AREA_M2;  // Pa (gauge, relative to zero-load)
-
-//     // Linear map: ΔP = (PaPerCount) * Δraw
-//     rawToPressure_PaPerCount = deltaP_Pa / deltaRaw;
-
-//     Serial.println(F("\nCalibration complete."));
-//     Serial.print(F("rawToPressure_PaPerCount = "));
-//     Serial.print(rawToPressure_PaPerCount, 6);
-//     Serial.println(F(" Pa/count"));
-//   }
-
-//   Serial.println(F("\nStarting live readings...\n"));
-// }
-
-// void loop() {
-//   // Read current raw value
-//   long rawValue = readAverageHX710B(10);   // average of 10 samples
-//   float raw = (float)rawValue;
-
-//   // Gauge pressure relative to zero-load
-//   float deltaRaw = raw - rawZero;
-//   float deltaP_Pa = deltaRaw * rawToPressure_PaPerCount; // Pa
-//   float pressure_kPa = deltaP_Pa / 1000.0f;              // kPa
-
-//   // Force and detected weight
-//   float F_N = deltaP_Pa * BELLOWS_AREA_M2;  // F = ΔP * A
-//   float weight_kg = F_N / GRAVITY;
-//   float weight_g = weight_kg * 1000.0f;
-
-//   // Serial output: raw, pressure, detected weight
-//   Serial.print("Raw: ");
-//   Serial.print(rawValue);
-//   Serial.print("  Pressure: ");
-//   Serial.print(pressure_kPa, 3);
-//   Serial.print(" kPa  Detected weight: ");
-//   Serial.print(weight_g, 1);
-//   Serial.println(" g");
-
-//   delay(50);
-// }
-
-/*!
- * @file test_mprls.cpp
- *
- * A basic test of the sensor with default settings
- * 
- * Designed specifically to work with the MPRLS sensor from Adafruit
- * ----> https://www.adafruit.com/products/3965
- *
- * These sensors use I2C to communicate, 2 pins (SCL+SDA) are required
- * to interface with the breakout.
- *
- * Adafruit invests time and resources providing this open source code,
- * please support Adafruit and open-source hardware by purchasing
- * products from Adafruit!
- *
- * Written by Limor Fried/Ladyada for Adafruit Industries.  
- *
- * MIT license, all text here must be included in any redistribution.
- *
- */
- 
-#include <Wire.h>
-#include "Adafruit_MPRLS.h"
-
-// You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
-#define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
-#define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
+// ---- Sensor object ----
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
 
+// // ---- Calibration variables ----
+float pressureZero_kPa[8];             // raw counts at zero weight
+// float pressureCali_kPa        = 0.0f;             // raw counts at known weight
+// float forceToSensorRatio      = 0.0f;             // slope: Pa per ADC count
+// float calibrationWeight_g     = 0.0f;             // known mass in grams
+
+uint8_t found_ports;
+
+// Wait for user to hit Enter in Serial Monitor
+void waitForEnter() {
+  while (!Serial.available()) { }
+  while (Serial.available()) { Serial.read(); } // clear buffer
+}
+
 void setup() {
+  Wire.begin();
+
   Serial.begin(115200);
-  Serial.println("MPRLS Simple Test");
-  if (! mpr.begin()) {
-    Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-    while (1) {
-      delay(10);
+  Serial.println("MPRLS Load Cell Test");
+  Serial.println("--------------------------------");
+
+  found_ports = tcaselectValidPorts(MUX_ADDR);
+  Serial.print("Found MPRLS on TCA9548A ports bitmask: 0x");
+  Serial.println(found_ports, BIN);
+  int num_active_ports = sumBits(found_ports);
+  Serial.print("Number of active ports with MPRLS: ");
+  Serial.println(num_active_ports);
+
+  for (uint8_t m = found_ports; m; m &= (m - 1)) {
+    uint8_t lsb = m & -m;                 // isolate lowest set bit
+    uint8_t ch  = __builtin_ctz(lsb);     // ESP32/GCC: index of that bit (0..7)
+
+    Serial.print("\n--- Selecting TCA9548A port ");
+    Serial.print(ch);
+    Serial.println(" ---");
+    tcaselect(ch, MUX_ADDR);
+    if (!mpr.begin(MPRLS_ADDR)) {
+      Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+      while (1) {
+        delay(10);
+      }
     }
+    Serial.println("Found MPRLS sensor");
+
+    // TODO: differentiate multiple sensors calibration on different ports
+    // ---- Step 1: zero-load baseline ----
+    Serial.println("Step 1: ZERO LOAD");
+    Serial.println("Make sure there is NO weight on the bellow.");
+    Serial.println("Press Enter in the Serial Monitor when ready.");
+    // waitForEnter();
+
+    pressureZero_kPa[ch] = HPA_TO_KPA(mpr.readPressure());
+    // Serial.print("pressureZero_kPa = ");
+    // Serial.println(pressureZero_kPa, 1);
+    // ------------------------------------
+
+
+  //   // ---- Step 2: known weight calibration ----
+  //   Serial.println("\nStep 2: KNOWN WEIGHT");
+  //   Serial.println("Place a known weight on the bellow and leave it there.");
+  //   Serial.println("Now type that weight in GRAMS (e.g. 100) and press Enter:");
+
+  //   calibrationWeight_g = 20.0f; // Default value
+
+  //   Serial.print("Calibration weight = ");
+  //   Serial.print(calibrationWeight_g, 2);
+  //   Serial.println(" g");
+
+  //   pressureCali_kPa = pressureZero_kPa + 0.4;  // HPA_TO_KPA(mpr.readPressure());
+  //   Serial.print("pressureCali_kPa = ");
+  //   Serial.println(pressureCali_kPa, 1);
+
+  //   float pressureDelta_kPa = pressureCali_kPa - pressureZero_kPa;
+  //   if (pressureDelta_kPa == 0.0f) {
+  //     Serial.println("ERROR: pressureDelta_kPa is zero. Check sensor / wiring / weight.");
+  //     forceToSensorRatio = 0.0f;
+  //   } else {
+
+  //     float F_N = GRAM_TO_NEWTON(calibrationWeight_g);
+  //     forceToSensorRatio = F_N / pressureDelta_kPa;  // N/kPa
+
+  //     Serial.println("\nCalibration complete.");
+  //     Serial.print("forceToSensorRatio = ");
+  //     Serial.print(forceToSensorRatio, 6);
+  //     Serial.println(" N/kPa");
+  //   }
   }
-  Serial.println("Found MPRLS sensor");
+  tcadisable(MUX_ADDR);
+
+  Serial.println("\nStarting live readings...\n");
 }
 
 
 void loop() {
-  if (! mpr.begin()) {
-    Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+  for (uint8_t m = found_ports; m; m &= (m - 1)) {
+    uint8_t lsb = m & -m;                 // isolate lowest set bit
+    uint8_t ch  = __builtin_ctz(lsb);     // ESP32/GCC: index of that bit (0..7)
+
+    Serial.print("\n--- Selecting TCA9548A port ");
+    Serial.print(ch);
+    Serial.println(" ---");
+    tcaselect(ch, MUX_ADDR);
+    if (! mpr.begin(MPRLS_ADDR)) {
+      Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+      delay(10);
+      return;
+    }
+
+    // Serial message starts
+    Serial.print(">");
+  
+    float pressure_kPa = HPA_TO_KPA(mpr.readPressure());
+    Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
+    Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
+
+    // Gauge pressure relative to zero-load
+    float F_g = (pressure_kPa - pressureZero_kPa[ch]) * FORCE_TO_SENSOR_RATIO;
+
+    // Serial Logging
+    Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":");
+    Serial.print(F_g, 1);
+    Serial.println();
+
     delay(10);
-    return;
   }
-  float pressure_hPa = mpr.readPressure();
-  Serial.print("Pressure (hPa): "); Serial.println(pressure_hPa);
-  Serial.print("Pressure (PSI): "); Serial.println(pressure_hPa / 68.947572932);
-  delay(1000);
 }
