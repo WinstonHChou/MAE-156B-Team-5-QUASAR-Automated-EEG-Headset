@@ -45,7 +45,7 @@ void setup() {
     if (!mpr.begin(MPRLS_ADDR)) {
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
       while (1) {
-        delay(10);
+        delay(MPRLS_READ_TIMEOUT);
       }
     }
     Serial.println("Found MPRLS sensor");
@@ -110,7 +110,7 @@ void loop() {
     tcaselect(ch, MUX_ADDR);
     if (!mpr.begin(MPRLS_ADDR)) {
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      delay(10);
+      delay(MPRLS_READ_TIMEOUT);
       return;
     }
 
