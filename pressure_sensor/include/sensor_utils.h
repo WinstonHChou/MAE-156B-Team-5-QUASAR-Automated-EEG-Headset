@@ -86,14 +86,14 @@ int sumBits(uint8_t bits) {
 // Structure for continuous, real-time filtering (e.g., in an embedded system loop)
 class LowPassFilter {
   public:
-    LowPassFilter(double beta_val) : beta(beta_val), previous_output(0.0) {}
+    LowPassFilter(float beta_val) : beta(beta_val), previous_output(0.0) {}
 
-    double update(double input_sample) {
-        double current_output = beta * input_sample + (1.0 - beta) * previous_output;
+    float update(float input_sample) {
+        float current_output = beta * input_sample + (1.0 - beta) * previous_output;
         previous_output = current_output; // Store current output for the next iteration
         return current_output;
     }
   private:
-    double beta;
-    double previous_output;
+    float beta;
+    float previous_output;
 };
