@@ -1,4 +1,5 @@
-#include "mprls_pressure_sensor.h"
+#include "config.h"
+#include "sensor_utils.h"
 
 #define MUX_ADDR DEFAULT_TCAADDR
 

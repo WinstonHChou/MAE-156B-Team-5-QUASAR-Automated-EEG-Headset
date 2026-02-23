@@ -1,12 +1,6 @@
-#include <Adafruit_MPRLS.h>
+#include "config.h"
 #include "tca9548a.h"
-
-// You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
-#define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
-#define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
-#define MPRLS_ADDR MPRLS_DEFAULT_ADDR
-
-#define MPRLS_SAMPLING_RATE_MS 10  // delay between pressure reads
+#include <Adafruit_MPRLS.h>
 
 // Physical constants
 #define GRAVITY 9.80665f                              // m/s^2
@@ -16,8 +10,8 @@
 #define NEWTON_TO_GRAM(x) ((x) * 1000.0f / GRAVITY) // convert Newtons to grams
 #define PA_TO_KPA(x) ((x) / 1000.0f)                  // 1 Pa = 0.001 kPa
 
-// Calibration Coefficients
-#define FORCE_TO_SENSOR_RATIO 56.436f  // N/kPa, calibrated on 2026/02/02
+// Calibration procedure:
+
 
 // future multi-mux support:
 // for (uint8_t mux = 0x70; mux <= 0x77; ++mux) {
@@ -87,3 +81,19 @@ int sumBits(uint8_t bits) {
   }
   return count;
 }
+
+// Low-pass filter (1st-order IIR)
+// Structure for continuous, real-time filtering (e.g., in an embedded system loop)
+class LowPassFilter {
+  public:
+    LowPassFilter(double beta_val) : beta(beta_val), previous_output(0.0) {}
+
+    double update(double input_sample) {
+        double current_output = beta * input_sample + (1.0 - beta) * previous_output;
+        previous_output = current_output; // Store current output for the next iteration
+        return current_output;
+    }
+  private:
+    double beta;
+    double previous_output;
+};
