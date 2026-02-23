@@ -107,27 +107,24 @@ void loop() {
     Serial.print(ch);
     Serial.println(" ---");
     tcaselect(ch, MUX_ADDR);
-    if (! mpr.begin(MPRLS_ADDR)) {
+    if (!mpr.begin(MPRLS_ADDR)) {
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
       delay(10);
       return;
     }
 
-    // Serial message starts
-    Serial.print(">");
-  
+    // Read pressure in kPa
     float pressure_kPa = HPA_TO_KPA(mpr.readPressure());
-    Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
-    Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
-
     // Gauge pressure relative to zero-load
     float F_g = (pressure_kPa - pressureZero_kPa[ch]) * FORCE_TO_SENSOR_RATIO;
 
     // Serial Logging
-    Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":");
-    Serial.print(F_g, 1);
+    Serial.print(">");
+    Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
+    Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
+    Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":"); Serial.print(F_g, 1);
     Serial.println();
 
-    delay(10);
+    delay(MPRLS_SAMPLING_RATE_MS);
   }
 }
