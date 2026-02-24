@@ -1,5 +1,5 @@
 #include <unity.h>
-#include "mprls_pressure_sensor.h"
+#include "sensor_utils.h"
 
 #define TEST_DURATION_MS 1000
 

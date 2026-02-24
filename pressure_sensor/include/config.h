@@ -4,7 +4,8 @@
 #define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 
 #define MPRLS_SAMPLING_RATE_MS 10   // delay between pressure reads
-#define MPRLS_READ_TIMEOUT     10   // ms to wait for end-of-conversion before giving up
+#define READING_TIMEOUT     10   // ms to wait for end-of-conversion before giving up
+#define LOWPASS_BETA     0.3f  // IIR filter coefficient (0.0-1.0), lower = smoother but more lag
 
 #define TCAADDR_ADDRESSES {0x72, 0x73, 0x74, 0x75}
 

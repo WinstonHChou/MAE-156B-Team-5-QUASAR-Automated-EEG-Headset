@@ -5,6 +5,7 @@
 
 // ---- Sensor object ----
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
+// LowPassFilter lowpass_filter = LowPassFilter(MPRLS_LOWPASS_BETA);
 
 // // ---- Calibration variables ----
 float pressureZero_kPa[8];             // raw counts at zero weight
@@ -43,10 +44,10 @@ void setup() {
     Serial.println(" ---");
     tcaselect(ch, MUX_ADDR);
     if (!mpr.begin(MPRLS_ADDR)) {
-      Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      delay(MPRLS_READ_TIMEOUT);
-      setup();  // Retry setup to find sensors again
-      return;
+      Serial.println("Failed to communicate with MPRLS sensor, check wiring? Please reboot after fixing.");
+      while (1) {
+        delay(READING_TIMEOUT);
+      }
     }
     Serial.println("Found MPRLS sensor");
 
@@ -110,8 +111,8 @@ void loop() {
     tcaselect(ch, MUX_ADDR);
     if (!mpr.begin(MPRLS_ADDR)) {
       Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      delay(MPRLS_READ_TIMEOUT);
-      return;
+      delay(READING_TIMEOUT);
+      continue;
     }
 
     // Read pressure in kPa
