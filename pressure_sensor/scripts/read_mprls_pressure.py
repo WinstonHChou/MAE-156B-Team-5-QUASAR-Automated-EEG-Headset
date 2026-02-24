@@ -104,11 +104,10 @@ def main(no_plot=False):
                     if last_unix_with_idx.get(sensor_idx, None) is not None:
                         dt = t_unix - last_unix_with_idx[sensor_idx]
                         if dt > 0:
-                            dt_samples_with_idx[sensor_idx] = dt_samples_with_idx.get(sensor_idx, deque(maxlen=50)).copy()
-                            dt_samples_with_idx[sensor_idx].append(dt)
+                            dt_samples_with_idx[sensor_idx] = dt_samples_with_idx.get(sensor_idx, deque(maxlen=50)).append(dt)
                     last_unix_with_idx[sensor_idx] = t_unix
 
-                    if dt_samples_with_idx[sensor_idx]:
+                    if dt_samples_with_idx.get(sensor_idx, None):
                         mean_dt = sum(dt_samples_with_idx[sensor_idx]) / len(dt_samples_with_idx[sensor_idx])
                         rate_hz = 1.0 / mean_dt if mean_dt > 0 else float('nan')
                     else:
