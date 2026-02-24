@@ -61,7 +61,7 @@ def main(no_plot=False):
 
     with open(out_path, "w", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["t_unix_s", "sensor_idx", "pressure_kpa", "pressure_psi", "weight_g"])  # header
+        w.writerow(["t_unix_s", "sensor_idx", "pressure_kpa", "pressure_psi", "weight_g", "pressure_rate_kpa"])  # header
 
         try:
             while True:
@@ -84,18 +84,20 @@ def main(no_plot=False):
 
                     # optional weight field
                     mw = re.search(fr"Detected_weight_g_{sensor_idx}:([-+]?\d*\.?\d+)", raw)
+                    mr = re.search(fr"Pressure_rate_kPa_{sensor_idx}:([-+]?\d*\.?\d+)", raw)
 
                     t_unix = time.time()
                     elapsed = t_unix - t0
                     pressure_kpa = float(m.group(2))
                     pressure_psi = pressure_kpa / 6.8947572932
                     weight_g = float(mw.group(1)) if mw else None
+                    pressure_rate_kpa = float(mr.group(1)) if mr else None
 
                     # log to CSV (include weight if present)
                     if weight_g is None:
-                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", ""])
+                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", "", f"{pressure_rate_kpa:.3f}"])
                     else:
-                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", f"{weight_g:.3f}"])
+                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", f"{weight_g:.3f}", f"{pressure_rate_kpa:.3f}"])
                     f.flush()
 
                     # sample-rate calculation
@@ -136,9 +138,9 @@ def main(no_plot=False):
 
                     # always print to console (include weight if available)
                     if weight_g is None:
-                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {rate_hz:.2f} Hz  ->  {out_path}")
+                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {pressure_rate_kpa:.3f} kPa/s, {rate_hz:.2f} Hz  ->  {out_path}")
                     else:
-                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {weight_g:.3f} g, {rate_hz:.2f} Hz  ->  {out_path}")
+                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {weight_g:.3f} g, {pressure_rate_kpa:.3f} kPa/s, {rate_hz:.2f} Hz  ->  {out_path}")
 
         except KeyboardInterrupt:
             print("Interrupted by user, closing...")
