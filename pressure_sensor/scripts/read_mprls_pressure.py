@@ -56,8 +56,8 @@ def main(no_plot=False):
 
     t0 = time.time()
     # for sample-rate estimation
-    last_unix = None
-    dt_samples = deque(maxlen=50)
+    last_unix_with_idx = {}
+    dt_samples_with_idx = {}
 
     with open(out_path, "w", newline="") as f:
         w = csv.writer(f)
@@ -101,14 +101,15 @@ def main(no_plot=False):
                     f.flush()
 
                     # sample-rate calculation
-                    if last_unix is not None:
-                        dt = t_unix - last_unix
+                    if last_unix_with_idx.get(sensor_idx, None) is not None:
+                        dt = t_unix - last_unix_with_idx[sensor_idx]
                         if dt > 0:
-                            dt_samples.append(dt)
-                    last_unix = t_unix
+                            dt_samples_with_idx[sensor_idx] = dt_samples_with_idx.get(sensor_idx, deque(maxlen=50)).copy()
+                            dt_samples_with_idx[sensor_idx].append(dt)
+                    last_unix_with_idx[sensor_idx] = t_unix
 
-                    if dt_samples:
-                        mean_dt = sum(dt_samples) / len(dt_samples)
+                    if dt_samples_with_idx[sensor_idx]:
+                        mean_dt = sum(dt_samples_with_idx[sensor_idx]) / len(dt_samples_with_idx[sensor_idx])
                         rate_hz = 1.0 / mean_dt if mean_dt > 0 else float('nan')
                     else:
                         rate_hz = float('nan')
