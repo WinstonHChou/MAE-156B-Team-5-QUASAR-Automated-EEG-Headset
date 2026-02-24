@@ -1,11 +1,12 @@
 #include "config.h"
 #include "sensor_utils.h"
+#include <Iir.h>
 
 #define MUX_ADDR DEFAULT_TCAADDR
 
 // ---- Sensor object ----
 Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
-// LowPassFilter lowpass_filter = LowPassFilter(MPRLS_LOWPASS_BETA);
+Iir::Butterworth::LowPass<2> lp;
 
 // // ---- Calibration variables ----
 float pressureZero_kPa[8];             // raw counts at zero weight
@@ -34,6 +35,9 @@ void setup() {
   int num_active_ports = sumBits(found_ports);
   Serial.print("Number of active ports with MPRLS: ");
   Serial.println(num_active_ports);
+  
+  // TODO: create for each sensor individual low-pass filter instances instead of sharing one global filter
+  lp.setup(MPRLS_SAMPLING_RATE_HZ, LOWPASS_CUTOFF_FREQ_HZ);
 
   for (uint8_t m = found_ports; m; m &= (m - 1)) {
     uint8_t lsb = m & -m;                 // isolate lowest set bit
@@ -59,6 +63,7 @@ void setup() {
     // waitForEnter();
 
     pressureZero_kPa[ch] = HPA_TO_KPA(mpr.readPressure());
+
     // Serial.print("pressureZero_kPa = ");
     // Serial.println(pressureZero_kPa, 1);
     // ------------------------------------
@@ -116,7 +121,7 @@ void loop() {
     }
 
     // Read pressure in kPa
-    float pressure_kPa = HPA_TO_KPA(mpr.readPressure());
+    float pressure_kPa = HPA_TO_KPA(lp.filter(mpr.readPressure()));
     // Gauge pressure relative to zero-load
     float F_g = (pressure_kPa - pressureZero_kPa[ch]) * FORCE_TO_SENSOR_RATIO;
 

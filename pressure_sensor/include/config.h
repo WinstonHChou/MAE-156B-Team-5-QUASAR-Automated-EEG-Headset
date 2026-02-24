@@ -3,9 +3,10 @@
 #define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
 #define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 
-#define MPRLS_SAMPLING_RATE_MS 10   // delay between pressure reads
-#define READING_TIMEOUT     10   // ms to wait for end-of-conversion before giving up
-#define LOWPASS_BETA     0.3f  // IIR filter coefficient (0.0-1.0), lower = smoother but more lag
+#define MPRLS_SAMPLING_RATE_MS  10      // delay between pressure reads
+#define MPRLS_SAMPLING_RATE_HZ  1000.0f / MPRLS_SAMPLING_RATE_MS
+#define READING_TIMEOUT         10      // ms to wait for end-of-conversion before giving up
+#define LOWPASS_CUTOFF_FREQ_HZ  3.0f    // Hz, lower = smoother but more lag
 
 #define TCAADDR_ADDRESSES {0x72, 0x73, 0x74, 0x75}
 
