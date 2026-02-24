@@ -8,7 +8,7 @@ import re
 import time
 import csv
 from datetime import datetime
-from collections import deque
+from collections import deque, defaultdict
 
 import serial
 from serial.tools import list_ports
@@ -57,7 +57,7 @@ def main(no_plot=False):
     t0 = time.time()
     # for sample-rate estimation
     last_unix_with_idx = {}
-    dt_samples_with_idx = {}
+    dt_samples_with_idx = defaultdict(lambda: deque(maxlen=50))
 
     with open(out_path, "w", newline="") as f:
         w = csv.writer(f)
@@ -104,10 +104,10 @@ def main(no_plot=False):
                     if last_unix_with_idx.get(sensor_idx, None) is not None:
                         dt = t_unix - last_unix_with_idx[sensor_idx]
                         if dt > 0:
-                            dt_samples_with_idx[sensor_idx] = dt_samples_with_idx.get(sensor_idx, deque(maxlen=50)).append(dt)
+                            dt_samples_with_idx[sensor_idx].append(dt)
                     last_unix_with_idx[sensor_idx] = t_unix
 
-                    if dt_samples_with_idx.get(sensor_idx, None):
+                    if dt_samples_with_idx[sensor_idx]:
                         mean_dt = sum(dt_samples_with_idx[sensor_idx]) / len(dt_samples_with_idx[sensor_idx])
                         rate_hz = 1.0 / mean_dt if mean_dt > 0 else float('nan')
                     else:
