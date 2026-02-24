@@ -36,7 +36,7 @@ void test_mprls0025_pressure(void) {
         snprintf(pres_buf, sizeof(pres_buf), "%.2f", pressure);
         TEST_MESSAGE(pres_buf);
 
-        delay(MPRLS_SAMPLING_RATE_MS);
+        delay(MPRLS_SAMPLING_INTERVAL_MS);
       }
     }
   }
@@ -71,7 +71,7 @@ void test_mprls0025_pressure(void) {
 //         snprintf(pres_buf, sizeof(pres_buf), "%.2f", pressure);
 //         TEST_MESSAGE(pres_buf);
 
-//         delay(MPRLS_SAMPLING_RATE_MS);
+//         delay(MPRLS_SAMPLING_INTERVAL_MS);
 //       }
 //     }
 //   }

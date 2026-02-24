@@ -1,18 +1,13 @@
 #include "config.h"
 #include "sensor_utils.h"
-#include <Iir.h>
 
 #define MUX_ADDR DEFAULT_TCAADDR
 
 // ---- Sensor object ----
-Adafruit_MPRLS mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN);
-Iir::Butterworth::LowPass<2> lp;
+Adafruit_MPRLS test_mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN, 0, 25, 10, 90, PSI_to_KPA);
 
-// // ---- Calibration variables ----
-float pressureZero_kPa[8];             // raw counts at zero weight
-// float pressureCali_kPa        = 0.0f;             // raw counts at known weight
-// float forceToSensorRatio      = 0.0f;             // slope: Pa per ADC count
-// float calibrationWeight_g     = 0.0f;             // known mass in grams
+// ---- Calibration variables ----
+std::map<uint8_t, std::unique_ptr<PneumaticLoadCell>> load_cells; // List of load cells corresponding to detected sensors
 
 uint8_t found_ports;
 
@@ -35,9 +30,6 @@ void setup() {
   int num_active_ports = sumBits(found_ports);
   Serial.print("Number of active ports with MPRLS: ");
   Serial.println(num_active_ports);
-  
-  // TODO: create for each sensor individual low-pass filter instances instead of sharing one global filter
-  lp.setup(MPRLS_SAMPLING_RATE_HZ, LOWPASS_CUTOFF_FREQ_HZ);
 
   for (uint8_t m = found_ports; m; m &= (m - 1)) {
     uint8_t lsb = m & -m;                 // isolate lowest set bit
@@ -47,91 +39,55 @@ void setup() {
     Serial.print(ch);
     Serial.println(" ---");
     tcaselect(ch, MUX_ADDR);
-    if (!mpr.begin(MPRLS_ADDR)) {
+    if (!test_mpr.begin(MPRLS_ADDR)) {
       Serial.println("Failed to communicate with MPRLS sensor, check wiring? Please reboot after fixing.");
       while (1) {
         delay(READING_TIMEOUT);
       }
     }
     Serial.println("Found MPRLS sensor");
+    load_cells[ch] = std::move(std::unique_ptr<PneumaticLoadCell>(new PneumaticLoadCell(ch, MUX_ADDR)));
 
-    // TODO: differentiate multiple sensors calibration on different ports
-    // ---- Step 1: zero-load baseline ----
-    Serial.println("Step 1: ZERO LOAD");
-    Serial.println("Make sure there is NO weight on the bellow.");
-    Serial.println("Press Enter in the Serial Monitor when ready.");
-    // waitForEnter();
-
-    pressureZero_kPa[ch] = HPA_TO_KPA(mpr.readPressure());
-
-    // Serial.print("pressureZero_kPa = ");
-    // Serial.println(pressureZero_kPa, 1);
-    // ------------------------------------
-
-
-  //   // ---- Step 2: known weight calibration ----
-  //   Serial.println("\nStep 2: KNOWN WEIGHT");
-  //   Serial.println("Place a known weight on the bellow and leave it there.");
-  //   Serial.println("Now type that weight in GRAMS (e.g. 100) and press Enter:");
-
-  //   calibrationWeight_g = 20.0f; // Default value
-
-  //   Serial.print("Calibration weight = ");
-  //   Serial.print(calibrationWeight_g, 2);
-  //   Serial.println(" g");
-
-  //   pressureCali_kPa = pressureZero_kPa + 0.4;  // HPA_TO_KPA(mpr.readPressure());
-  //   Serial.print("pressureCali_kPa = ");
-  //   Serial.println(pressureCali_kPa, 1);
-
-  //   float pressureDelta_kPa = pressureCali_kPa - pressureZero_kPa;
-  //   if (pressureDelta_kPa == 0.0f) {
-  //     Serial.println("ERROR: pressureDelta_kPa is zero. Check sensor / wiring / weight.");
-  //     forceToSensorRatio = 0.0f;
-  //   } else {
-
-  //     float F_N = GRAM_TO_NEWTON(calibrationWeight_g);
-  //     forceToSensorRatio = F_N / pressureDelta_kPa;  // N/kPa
-
-  //     Serial.println("\nCalibration complete.");
-  //     Serial.print("forceToSensorRatio = ");
-  //     Serial.print(forceToSensorRatio, 6);
-  //     Serial.println(" N/kPa");
-  //   }
+    // Zero-load calibration
+    if (load_cells[ch]) {
+      load_cells[ch]->begin();
+      load_cells[ch]->resetZeroLoad();
+      Serial.println("Zero load reset complete.");
+    } else {
+      Serial.println("Critical Error: Load cell pointer is null!");
+    }
   }
   tcadisable(MUX_ADDR);
 
   Serial.println("\nStarting live readings...\n");
 }
 
-
+unsigned long lastMillis = 0;
 void loop() {
-  for (uint8_t m = found_ports; m; m &= (m - 1)) {
-    uint8_t lsb = m & -m;                 // isolate lowest set bit
-    uint8_t ch  = __builtin_ctz(lsb);     // ESP32/GCC: index of that bit (0..7)
+  if (millis() - lastMillis >= MPRLS_SAMPLING_INTERVAL_MS) {
+    lastMillis = millis();
 
-    Serial.print("\n--- Selecting TCA9548A port ");
-    Serial.print(ch);
-    Serial.println(" ---");
-    tcaselect(ch, MUX_ADDR);
-    if (!mpr.begin(MPRLS_ADDR)) {
-      Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-      delay(READING_TIMEOUT);
-      continue;
+    for (uint8_t m = found_ports; m; m &= (m - 1)) {
+      uint8_t lsb = m & -m;                 // isolate lowest set bit
+      uint8_t ch  = __builtin_ctz(lsb);     // ESP32/GCC: index of that bit (0..7)
+
+      Serial.print("\n--- Selecting TCA9548A port ");
+      Serial.print(ch);
+      Serial.println(" ---");
+      if (!load_cells[ch]->begin()) { continue; }
+
+      // Read pressure in kPa and force in grams
+      float pressure_kPa = load_cells[ch]->readPressure();
+      float F_g = load_cells[ch]->getForceFromPressure();
+      float pressure_rate = load_cells[ch]->getPressureRate();
+
+      // Serial Logging
+      Serial.print(">");
+      Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
+      Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
+      Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":"); Serial.print(F_g, 1);
+      Serial.print(",Pressure_rate_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_rate);
+      Serial.println();
     }
-
-    // Read pressure in kPa
-    float pressure_kPa = HPA_TO_KPA(lp.filter(mpr.readPressure()));
-    // Gauge pressure relative to zero-load
-    float F_g = (pressure_kPa - pressureZero_kPa[ch]) * FORCE_TO_SENSOR_RATIO;
-
-    // Serial Logging
-    Serial.print(">");
-    Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa);
-    Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa));
-    Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":"); Serial.print(F_g, 1);
-    Serial.println();
-
-    delay(MPRLS_SAMPLING_RATE_MS);
   }
 }
