@@ -94,8 +94,8 @@ def main(no_plot=False):
                     pressure_rate_kpa = float(mr.group(1)) if mr else None
 
                     # log to CSV (include weight if present)
-                    if weight_g is None:
-                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", "", f"{pressure_rate_kpa:.3f}"])
+                    if weight_g is None or pressure_rate_kpa is None:
+                        w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", "", ""])
                     else:
                         w.writerow([f"{t_unix:.6f}", f"{sensor_idx}", f"{pressure_kpa:.3f}", f"{pressure_psi:.3f}", f"{weight_g:.3f}", f"{pressure_rate_kpa:.3f}"])
                     f.flush()
@@ -137,8 +137,8 @@ def main(no_plot=False):
                         fig.canvas.flush_events()
 
                     # always print to console (include weight if available)
-                    if weight_g is None:
-                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {pressure_rate_kpa:.3f} kPa/s, {rate_hz:.2f} Hz  ->  {out_path}")
+                    if weight_g is None or pressure_rate_kpa is None:
+                        print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {rate_hz:.2f} Hz  ->  {out_path}")
                     else:
                         print(f"{t_unix:.3f}, {sensor_idx}, {pressure_kpa:.3f} kPa, {pressure_psi:.3f} psi, {weight_g:.3f} g, {pressure_rate_kpa:.3f} kPa/s, {rate_hz:.2f} Hz  ->  {out_path}")
 
