@@ -4,7 +4,7 @@ import time
 
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation  # standard live-update approach [web:36]
+from matplotlib.animation import FuncAnimation
 
 def main():
     if len(sys.argv) < 2:
@@ -23,7 +23,7 @@ def main():
 
     def update(_frame):
         try:
-            df = pd.read_csv(csv_path)  # common way to load CSV into DataFrame [web:40]
+            df = pd.read_csv(csv_path)  # common way to load CSV into DataFrame
         except Exception:
             return line,
 
@@ -39,7 +39,7 @@ def main():
         ax.autoscale_view()
         return line,
 
-    ani = FuncAnimation(fig, update, interval=200)  # periodically refresh plot [web:36]
+    ani = FuncAnimation(fig, update, interval=200)  # periodically refresh plot
     plt.show()
 
 if __name__ == "__main__":

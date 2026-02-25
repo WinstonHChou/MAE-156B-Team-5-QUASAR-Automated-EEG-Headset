@@ -38,4 +38,5 @@
 .pio/
 
 # logs
+log/
 mprls_log*.csv
