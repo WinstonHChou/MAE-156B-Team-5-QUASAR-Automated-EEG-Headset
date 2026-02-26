@@ -145,6 +145,7 @@ class PneumaticLoadCell {
 
     float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
+    float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
 };
