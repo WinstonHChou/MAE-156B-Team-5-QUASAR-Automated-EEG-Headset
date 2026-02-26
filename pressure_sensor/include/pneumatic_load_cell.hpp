@@ -65,7 +65,7 @@ class PneumaticLoadCell {
     }
 
     float getPressureRate() {
-      return current_kPa_ - prev_kPa_;  // simple finite difference; could be improved with more history
+      return (current_kPa_ - prev_kPa_) * MPRLS_SAMPLING_RATE_HZ;  // simple finite difference; could be improved with more history
     }
 
     float getForceFromPressure() {
