@@ -86,7 +86,7 @@ void loop() {
       Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa, 4);
       Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa), 4);
       Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":"); Serial.print(F_g, 4);
-      Serial.print(",Pressure_rate_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_rate, 4);
+      Serial.print(",Pressure_rate_kPa_s_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_rate, 4);
       Serial.println();
     }
   }
