@@ -4,7 +4,7 @@ from scipy import signal
 from collections import deque
 
 WINDOW_SIZE = 5  # number of samples
-PRESSURE_RATE_THRESHOLD = 0.1  # kPa/s
+MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S = 0.1  # kPa/s
 FORCE_TO_SENSOR_RATIO = 56.436 # N/kPa, temporary conversion factor based on preliminary data; can be refined with more testing
 
 MPRLS_SAMPLING_RATE_HZ = 100  # Hz
@@ -85,7 +85,7 @@ class EstimatorPipelineSimulator:
             estimated_pressure_kPa = pressure_kPa
 
         # Update current force based on pressure and pressure rate
-        if abs(np.mean(self.rate_kPa_s_buffer)) > PRESSURE_RATE_THRESHOLD:
+        if abs(np.mean(self.rate_kPa_s_buffer)) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S:
             self.current_force_N = (estimated_pressure_kPa - self.zero_kPa) * FORCE_TO_SENSOR_RATIO * GRAMS_TO_NEWTONS
         else:
             self.zero_kPa = self.calculateDriftingCompensatedZeroPressure(estimated_pressure_kPa)

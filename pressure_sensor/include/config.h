@@ -14,3 +14,4 @@
 
 // Calibration Coefficients
 #define FORCE_TO_SENSOR_RATIO 56.436f  // grams/kPa, calibrated on 2026/02/02
+#define MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S 0.1f  // Min pressure rate to accept (kPa/s), to filter out drifts

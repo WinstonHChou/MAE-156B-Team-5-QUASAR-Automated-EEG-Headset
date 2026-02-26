@@ -108,6 +108,16 @@ class PneumaticLoadCell {
     float readPressure() {
       prev_kPa_ = current_kPa_;
       current_kPa_ = lp_.filter(mpr_.readPressure());
+
+      // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
+      // otherwise calculate drifting compensated zero load pressure
+      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
+        // Update force reading only if pressure rate is above threshold to filter out drifts
+        current_force_g_ = (current_kPa_ - zero_kPa_) * ratio_;  // in grams
+      } else {
+        // Calculate drifting compensated zero load pressure
+        zero_kPa_ = current_kPa_ - (current_force_g_ / ratio_);
+      }
       return current_kPa_;
     }
 
@@ -116,7 +126,7 @@ class PneumaticLoadCell {
     }
 
     float getForceFromPressure() {
-      return (current_kPa_ - zero_kPa_) * ratio_;  // in grams
+      return current_force_g_;
     }
 
     // Calibration procedure
