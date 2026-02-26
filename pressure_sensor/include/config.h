@@ -1,7 +1,8 @@
+#pragma once
+
 // You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
 #define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
 #define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
-#define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 
 #define MPRLS_SAMPLING_INTERVAL_MS  10      // delay between pressure reads
 #define MPRLS_SAMPLING_RATE_HZ  1000.0f / MPRLS_SAMPLING_INTERVAL_MS

@@ -1,21 +1,11 @@
+#pragma once
+
 #include "config.h"
 #include "tca9548a.h"
+#include "pneumatic_load_cell.hpp"
 
 #include <memory>
 #include <vector>
-#include <map>
-#include <Adafruit_MPRLS.h>
-#include <Iir.h>
-
-// Physical constants
-#define GRAVITY 9.80665f                              // m/s^2
-#define KPA_TO_PSI(x) ((x) / 6.8947572932f)           // 1 PSI = 6.8947572932 kPa
-#define HPA_TO_KPA(x) ((x) / 10.0f)                   // 1 hPa = 0.1 kPa
-#define GRAM_TO_NEWTON(x) ((x) / 1000.0f * GRAVITY)   // convert grams to Newtons
-#define NEWTON_TO_GRAM(x) ((x) * 1000.0f / GRAVITY) // convert Newtons to grams
-#define PA_TO_KPA(x) ((x) / 1000.0f)                  // 1 Pa = 0.001 kPa
-#define PSI_to_KPA (6.8947572932f)   ///< Constant: PSI to KPA conversion factor
-
 
 // future multi-mux support:
 // for (uint8_t mux = 0x70; mux <= 0x77; ++mux) {
@@ -26,7 +16,6 @@
 //     tcadisable(mux);
 //   }
 // }
-
 
 /**
  * @brief Scan TCA9548A multiplexer channels for an MPRLS device and return a bitmask of responding channels.
@@ -85,67 +74,3 @@ int sumBits(uint8_t bits) {
   }
   return count;
 }
-
-// Pneumatic Load Cell
-class PneumaticLoadCell {
-  public:
-    PneumaticLoadCell(uint8_t channel, uint8_t mux_addr)
-      : ch_(channel), mux_(mux_addr) {
-      lp_.setup(MPRLS_SAMPLING_RATE_HZ, LOWPASS_CUTOFF_FREQ_HZ);
-    }
-
-    // Read pressure from the sensor
-    boolean begin() {
-      tcaselect(ch_, mux_);
-      if (!mpr_.begin(MPRLS_ADDR)) {
-        Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
-        delay(READING_TIMEOUT);
-        return false;
-      }
-      return true;
-    }
-
-    float readPressure() {
-      prev_kPa_ = current_kPa_;
-      current_kPa_ = lp_.filter(mpr_.readPressure());
-
-      // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
-      // otherwise calculate drifting compensated zero load pressure
-      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
-        // Update force reading only if pressure rate is above threshold to filter out drifts
-        current_force_g_ = (current_kPa_ - zero_kPa_) * ratio_;  // in grams
-      } else {
-        // Calculate drifting compensated zero load pressure
-        zero_kPa_ = current_kPa_ - (current_force_g_ / ratio_);
-      }
-      return current_kPa_;
-    }
-
-    float getPressureRate() {
-      return current_kPa_ - prev_kPa_;  // simple finite difference; could be improved with more history
-    }
-
-    float getForceFromPressure() {
-      return current_force_g_;
-    }
-
-    // Calibration procedure
-    void resetZeroLoad() {
-      zero_kPa_ = mpr_.readPressure();
-    }
-
-  private:
-    Adafruit_MPRLS mpr_ = Adafruit_MPRLS(RESET_PIN, EOC_PIN,
-                                         0, 25,
-                                         10, 90,
-                                         PSI_to_KPA);
-    Iir::Butterworth::LowPass<2> lp_;
-    uint8_t ch_;           // Channel number
-    uint8_t mux_;          // Multiplexer address
-
-    float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)
-    float current_kPa_ = 0.0; // Latest pressure reading (kPa)
-    float current_force_g_ = 0.0; // Latest force reading (grams)
-    float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
-    float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
-};

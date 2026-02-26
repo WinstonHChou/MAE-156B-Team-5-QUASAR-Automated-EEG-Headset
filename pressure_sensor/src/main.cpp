@@ -1,7 +1,8 @@
 #include "config.h"
 #include "sensor_utils.h"
+#include "pneumatic_load_cell.hpp"
 
-#define MUX_ADDR DEFAULT_TCAADDR
+#define MUX_ADDR DEFAULT_TCAADDR  // TODO: Remove this hardcoded address and support scanning multiple muxes
 
 // ---- Sensor object ----
 Adafruit_MPRLS test_mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN, 0, 25, 10, 90, PSI_to_KPA);
@@ -84,7 +85,7 @@ void loop() {
       // Serial Logging
       Serial.print(">");
       Serial.print("Pressure_kPa_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa, 4);
-      Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(KPA_TO_PSI(pressure_kPa), 4);
+      Serial.print(",Pressure_PSI_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
       Serial.print(",Detected_weight_g_"); Serial.print(ch); Serial.print(":"); Serial.print(F_g, 4);
       Serial.print(",Pressure_rate_kPa_s_"); Serial.print(ch); Serial.print(":"); Serial.print(pressure_rate, 4);
       Serial.println();
