@@ -50,7 +50,10 @@ class PneumaticLoadCell {
 
     float readPressure() {
       prev_kPa_ = current_kPa_;
+      last_timestamp_ms_ = current_timestamp_ms_;
+
       current_kPa_ = lp_.filter(mpr_.readPressure());
+      current_timestamp_ms_ = millis();
 
       // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
       // otherwise calculate drifting compensated zero load pressure
@@ -65,7 +68,11 @@ class PneumaticLoadCell {
     }
 
     float getPressureRate() {
-      return (current_kPa_ - prev_kPa_) * MPRLS_SAMPLING_RATE_HZ;  // simple finite difference; could be improved with more history
+      if (current_timestamp_ms_ == last_timestamp_ms_) {
+        return 0.0f;
+      }
+      const float dt = (current_timestamp_ms_ - last_timestamp_ms_) / 1000.0f;  // convert to seconds
+      return (current_kPa_ - prev_kPa_) / dt;  // simple finite difference; could be improved with more history
     }
 
     float getForceFromPressure() {
@@ -99,4 +106,6 @@ class PneumaticLoadCell {
     float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
+    unsigned long current_timestamp_ms_ = 0.0; // Timestamp of the current reading for rate calculation
+    unsigned long last_timestamp_ms_ = 0.0;  // Timestamp of the last reading for rate calculation
 };
