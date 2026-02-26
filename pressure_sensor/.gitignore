@@ -37,6 +37,10 @@
 # platformpio
 .pio/
 
+# Python
+__pycache__/
+*.pyc
+
 # logs
 log/
 mprls_log*.csv

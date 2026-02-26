@@ -13,4 +13,4 @@
 #define TCAADDR_ADDRESSES {0x72, 0x73, 0x74, 0x75}
 
 // Calibration Coefficients
-#define FORCE_TO_SENSOR_RATIO 56.436f  // N/kPa, calibrated on 2026/02/02
+#define FORCE_TO_SENSOR_RATIO 56.436f  // grams/kPa, calibrated on 2026/02/02
