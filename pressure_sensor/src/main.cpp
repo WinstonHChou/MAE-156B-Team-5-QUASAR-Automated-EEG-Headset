@@ -19,7 +19,7 @@ void waitForEnter() {
 }
 
 void setup() {
-  Wire.begin();
+  Wire.begin(SDA_PIN, SCL_PIN);
 
   Serial.begin(115200);
   Serial.println("MPRLS Load Cell Test");

@@ -40,7 +40,7 @@ int tcaselect(uint8_t i, uint8_t addr = DEFAULT_TCAADDR) {
  * are re-enabled.
  *
  * @param addr I2C 7-bit address of the TCA9548A. Defaults to DEFAULT_TCAADDR.
- *             Ensure Wire.begin() has been called prior to invoking this function.
+ *             Ensure Wire.begin(SDA_PIN, SCL_PIN) has been called prior to invoking this function.
  *
  * @return int Status code returned by Wire.endTransmission():
  *             0 = Success

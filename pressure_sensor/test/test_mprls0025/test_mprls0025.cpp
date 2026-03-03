@@ -1,4 +1,5 @@
 #include <unity.h>
+#include "config.h"
 #include "sensor_utils.h"
 
 #define TEST_DURATION_MS 1000
@@ -86,7 +87,7 @@ static void run_all_tests(void) {
 }
 
 void setup() {
-  Wire.begin();
+  Wire.begin(SDA_PIN, SCL_PIN);
   run_all_tests();
 }
 
