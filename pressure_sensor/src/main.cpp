@@ -12,12 +12,6 @@ std::map<uint8_t, std::unique_ptr<PneumaticLoadCell>> load_cells; // List of loa
 
 uint8_t found_ports;
 
-// Wait for user to hit Enter in Serial Monitor
-void waitForEnter() {
-  while (!Serial.available()) { }
-  while (Serial.available()) { Serial.read(); } // clear buffer
-}
-
 void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
 
