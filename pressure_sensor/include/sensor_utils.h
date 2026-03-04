@@ -5,17 +5,19 @@
 #include "pneumatic_load_cell.hpp"
 
 #include <memory>
-#include <vector>
+#include <array>
+#include <map>
 
-// future multi-mux support:
-// for (uint8_t mux = 0x70; mux <= 0x77; ++mux) {
-//   for (uint8_t ch = 0; ch < 8; ++ch) {
-//     if (tcaselect(ch, mux) != 0) continue; // no mux/device there
-//     // probe downstream addresses or talk to devices
-//     // ...
-//     tcadisable(mux);
-//   }
-// }
+
+// Helper: count set bits in an 8-bit bitmask (used for TCA9548A port bitmask)
+int sumBits(uint8_t bits) {
+  int count = 0;
+  while (bits) {
+    count += bits & 1;
+    bits >>= 1;
+  }
+  return count;
+}
 
 /**
  * @brief Scan TCA9548A multiplexer channels for an MPRLS device and return a bitmask of responding channels.
@@ -65,12 +67,22 @@ uint8_t tcaselectValidPorts(uint8_t mux = DEFAULT_TCAADDR) {
   return found_ports;
 }
 
-// Helper: count set bits in an 8-bit bitmask (used for TCA9548A port bitmask)
-int sumBits(uint8_t bits) {
-  int count = 0;
-  while (bits) {
-    count += bits & 1;
-    bits >>= 1;
+// Scan multiple multiplexers and channels for MPRLS devices and return a mapping of mux addresses to bitmasks of valid channels
+void scanAvailableSensorOverMultipleTCAs(std::map<uint8_t, uint8_t>& mux_to_valid_channels_mask) {
+  for (const auto& mux : TCAADDR_ADDRESSES) {
+    tcadisable(mux);  // Ensure mux is disabled before scanning
   }
-  return count;
+  for (const auto& mux : TCAADDR_ADDRESSES) {
+    uint8_t valid_channels_mask = tcaselectValidPorts(mux);
+    if (valid_channels_mask != 0x00) {
+      Serial.print("Found MPRLS on TCA9548A 0x");
+      Serial.print(mux, HEX);
+      Serial.print(" ports bitmask: 0x");
+      Serial.println(valid_channels_mask, BIN);
+      int num_active_ports = sumBits(valid_channels_mask);
+      Serial.print("Number of active ports with MPRLS: ");
+      Serial.println(num_active_ports);
+      mux_to_valid_channels_mask[mux] = valid_channels_mask;
+    }
+  }
 }

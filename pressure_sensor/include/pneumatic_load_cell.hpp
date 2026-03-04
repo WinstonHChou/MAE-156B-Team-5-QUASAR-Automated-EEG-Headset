@@ -48,6 +48,11 @@ class PneumaticLoadCell {
       return true;
     }
 
+    // End communication with the sensor (if needed)
+    void end() {
+      tcadisable(mux_);
+    }
+
     float readPressure() {
       prev_kPa_ = current_kPa_;
       last_timestamp_ms_ = current_timestamp_ms_;

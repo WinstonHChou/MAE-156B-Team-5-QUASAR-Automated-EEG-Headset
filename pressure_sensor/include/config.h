@@ -1,20 +1,25 @@
 #pragma once
+#include <cstdint>
 
-// You dont *need* a reset and EOC pin for most uses, so we set to -1 and don't connect
-#define RESET_PIN  -1  // set to any GPIO pin # to hard-reset on begin()
-#define EOC_PIN    -1  // set to any GPIO pin to read end-of-conversion by pin
-#define SDA_PIN   22  // not ESP32 default SDA pin, it's reversed on the breakout board, so we have to specify it here
-#define SCL_PIN   21  // not ESP32 default SCL pin, it's reversed on the breakout board, so we have to specify it here
+// 1. Hardware Pins
+#define RESET_PIN   -1 
+#define EOC_PIN     -1 
+#define SDA_PIN     22  // not ESP32 default SDA pin (21), it's reversed on the breakout board, so we have to specify it here
+#define SCL_PIN     21  // not ESP32 default SCL pin (22), it's reversed on the breakout board, so we have to specify it here
 
-#define MPRLS_SAMPLING_INTERVAL_MS  10      // delay between pressure reads
-#define MPRLS_SAMPLING_RATE_HZ  1000.0f / MPRLS_SAMPLING_INTERVAL_MS
-#define READING_TIMEOUT         10      // ms to wait for end-of-conversion before giving up
+// 2. The Addressing Logic
+#define TCAADDR_ADDRESSES {0x70, 0x71, 0x72, 0x73}
+constexpr uint8_t TCA_LIST[] = TCAADDR_ADDRESSES;
 
-#define LOWPASS_ORDER           2       // Butterworth low-pass filter order
-#define LOWPASS_CUTOFF_FREQ_HZ  3.0f    // Hz, lower = smoother but more lag
+#define NUM_OF_SENSOR_SLOTS (sizeof(TCA_LIST) / sizeof(TCA_LIST[0]) * 8)
 
-#define TCAADDR_ADDRESSES {0x72, 0x73, 0x74, 0x75}
+// 3. Timing & Filtering
+#define MPRLS_SAMPLING_INTERVAL_MS   10
+#define MPRLS_SAMPLING_RATE_HZ       (1000.0f / MPRLS_SAMPLING_INTERVAL_MS)
+#define READING_TIMEOUT              10
 
-// Calibration Coefficients
-#define FORCE_TO_SENSOR_RATIO 56.436f  // grams/kPa, calibrated on 2026/02/02
-#define MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S 0.1f  // Min pressure rate to accept (kPa/s), to filter out drifts
+// 4. Physics & Calibration
+#define LOWPASS_ORDER                2
+#define LOWPASS_CUTOFF_FREQ_HZ       3.0f
+#define FORCE_TO_SENSOR_RATIO        56.436f
+#define MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S 0.1f
