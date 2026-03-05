@@ -1,6 +1,9 @@
 #include "config.h"
 #include "sensor_utils.h"
 #include "pneumatic_load_cell.hpp"
+#include "serial_bridge.hpp"
+
+SerialBridge bridge = SerialBridge();
 
 // Dummy MPRLS object for probing devices during setup
 Adafruit_MPRLS test_mpr = Adafruit_MPRLS(RESET_PIN, EOC_PIN, 0, 25, 10, 90, PSI_to_KPA);
@@ -11,8 +14,9 @@ std::array<std::unique_ptr<PneumaticLoadCell>, NUM_OF_SENSOR_SLOTS> load_cells; 
 
 void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
-
   Serial.begin(115200);
+  bridge.begin(Serial);
+
   Serial.println("MPRLS Load Cell Test");
   Serial.println("--------------------------------");
 
