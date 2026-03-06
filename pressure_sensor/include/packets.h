@@ -34,8 +34,9 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_RESET_ZERO_LOAD = 0,
-    REQUEST_CALIBRATION = 1,
+    REQUEST_NONE = 0,
+    REQUEST_RESET_ZERO_LOAD = 1,
+    REQUEST_CALIBRATION = 2,
     // Add more request types as needed
 };
 
@@ -50,7 +51,7 @@ enum RequestType : uint8_t {
  * @var sensor_idx
  *      Index of the target sensor (0-15 for up to 2 muxes)
  * @var request_idx
- *      Type of request (0 = reset zero load, 1 = calibration, etc.)
+ *      Type of request (0 = none, 1 = reset zero load, 2 = calibration, etc.)
  * @var flags
  *      Bitmask for control flags (see ControlFlags enum)
  * @var error_code

@@ -90,6 +90,15 @@ void loop() {
         Serial.print(",Detected_weight_g_"); Serial.print(sensor_idx); Serial.print(":"); Serial.print(F_g, 4);
         Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor_idx); Serial.print(":"); Serial.print(pressure_rate, 4);
         Serial.println();
+
+        bridge.sendSensorPacket(
+          SensorPacket{
+            .sensor_idx = static_cast<uint8_t>(sensor_idx),
+            .sensor_pressure_kPa = pressure_kPa,
+            .sensor_pressure_rate_kPa_s = pressure_rate,
+            .sensor_force_g = F_g
+          }
+        );
       }
       tcadisable(entry.first);
     }
