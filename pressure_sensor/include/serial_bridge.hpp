@@ -11,7 +11,7 @@ class SerialBridge {
       transfer_.begin(_port);
     }
 
-    void sendSensorData(const SensorPacket& packet) {
+    void sendSensorPacket(const SensorPacket& packet) {
       uint16_t sendSize = 0;
       sendSize = transfer_.txObj(packet, sendSize);
       transfer_.sendData(sendSize);
