@@ -13,10 +13,8 @@
 #define BRIDGE_BAUDRATE 115200
 
 // 3. The Addressing Logic
-#define TCAADDR_ADDRESSES {0x70, 0x71, 0x72, 0x73}
-constexpr uint8_t TCA_LIST[] = TCAADDR_ADDRESSES;
-
-#define NUM_OF_SENSOR_SLOTS (sizeof(TCA_LIST) / sizeof(TCA_LIST[0]) * 8)
+constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
+#define NUM_OF_SENSOR_SLOTS (sizeof(TCAADDR_ADDRESSES) / sizeof(TCAADDR_ADDRESSES[0]) * 8)
 
 // 4. Timing & Filtering
 #define MPRLS_SAMPLING_INTERVAL_MS   10
