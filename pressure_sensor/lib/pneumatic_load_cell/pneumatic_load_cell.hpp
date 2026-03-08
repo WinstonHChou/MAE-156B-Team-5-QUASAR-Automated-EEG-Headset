@@ -2,7 +2,7 @@
 
 #include "config.h"
 #include "tca9548a.h"
-#include "mprls0025pa00001a/mprls0025pa00001a.hpp"
+#include "mprls0025pa00001a.hpp"
 
 #include <map>
 #include <iterator>

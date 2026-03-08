@@ -1,7 +1,11 @@
 #include "config.h"
-#include "sensor_utils.h"
+#include "tca9548a.h"
 #include "pneumatic_load_cell.hpp"
 #include "serial_bridge.hpp"
+
+#include <memory>
+#include <array>
+
 
 SerialBridge bridge = SerialBridge();
 
@@ -18,7 +22,7 @@ void setup() {
   Serial.println("--------------------------------");
 
   std::map<uint8_t, uint8_t> mux_to_valid_channels_mask; // Map of mux address to bitmask of valid channels
-  scanAvailableSensorOverMultipleTCAs(mux_to_valid_channels_mask);
+  scanAvailableSensorOverMultipleTCAs(MPRLS_ADDR, mux_to_valid_channels_mask);
   for (const auto& entry : mux_to_valid_channels_mask) {
     const uint8_t& mux_addr = entry.first;
     const uint8_t& channels_mask = entry.second;
@@ -88,12 +92,12 @@ void loop() {
         float pressure_rate = sensor->getPressureRate();
 
         // Serial Logging
-        Serial.print(">");
-        Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
-        Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
-        Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
-        Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
-        Serial.println();
+        // Serial.print(">");
+        // Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
+        // Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
+        // Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
+        // Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
+        // Serial.println();
 
         // Send via SerialBridge
         SensorPacket pkt;

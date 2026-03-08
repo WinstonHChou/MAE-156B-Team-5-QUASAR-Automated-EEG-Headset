@@ -1,6 +1,5 @@
 #pragma once
 #include <cstdint>
-#include "tca9548a.h"
 
 // 1. Hardware Pins
 #define RESET_PIN   -1 
@@ -9,6 +8,11 @@
 #define SCL_PIN     21  // not ESP32 default SCL pin (22), it's reversed on the breakout board, so we have to specify it here
 
 // 2. Communication Parameters
+#define I2C_MIN_ADDRESS 0x00
+#define I2C_MAX_ADDRESS 0x7F
+#define I2C_STANDARD_MODE_CLOCK_FREQ 100000L
+#define I2C_FAST_MODE_CLOCK_FREQ 400000L
+
 #define I2C_CLOCK_FREQ I2C_FAST_MODE_CLOCK_FREQ
 #define BRIDGE_BAUDRATE 115200
 
