@@ -116,7 +116,7 @@ void loop() {
     }
 
     unsigned long loop_time = millis() - lastMillis;
-    Serial.println(loop_time);
+    // Serial.println(loop_time);
     if (loop_time > MPRLS_SAMPLING_INTERVAL_MS) {
       Serial.print("Warning: Loop time ");
       Serial.print(loop_time);

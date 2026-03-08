@@ -12,6 +12,10 @@ from pySerialTransfer.pySerialTransfer import SerialTransfer, Status, STRUCT_FOR
 
 BAUD = 115200
 
+class PacketID(IntFlag):
+    PACKET_CONTROL = 0x00
+    PACKET_SENSOR  = 0x01
+
 class ControlFlags(IntFlag):
     CTRL_ACK  = 1 << 0  # 1 = ACK, 0 = NACK
     CTRL_BUSY = 1 << 1  # sensor busy
@@ -37,6 +41,9 @@ class Packet(ABC):
     def deserialize(self, link):
         pass
 
+    def to_str(self):
+        return str(self.__dict__)
+
 class ControlPacket(Packet):
     def __init__(self):
         super().__init__()
@@ -47,8 +54,8 @@ class ControlPacket(Packet):
     
     def deserialize(self, link):
         recSize = 0
-        self.sensor_idx = link.rx_obj(obj_type='i', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['i']
+        self.sensor_idx = link.rx_obj(obj_type='b', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['b']
         self.request_idx = link.rx_obj(obj_type='b', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['b']
         self.flags = link.rx_obj(obj_type='b', start_pos=recSize)
@@ -65,8 +72,8 @@ class SensorPacket(Packet):
 
     def deserialize(self, link):
         recSize = 0
-        self.sensor_idx = link.rx_obj(obj_type='i', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['i']
+        self.sensor_idx = link.rx_obj(obj_type='b', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['b']
         self.sensor_pressure_kPa = link.rx_obj(obj_type='f', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['f']
         self.sensor_pressure_rate_kPa_s = link.rx_obj(obj_type='f', start_pos=recSize)
@@ -107,20 +114,25 @@ def sendPacket(link, pkt: Packet):
     send_size = pkt.serialize(link)
     link.send(send_size)
 
-def receivePacket(link, pkt: Packet):
+def receivePacket(link):
     '''
     Helper function to receive a packet from the Arduino. The packet type can be
     specified to determine how to parse the incoming data.
     
     Parameters:
         link (SerialTransfer): The SerialTransfer link object used for communication.
-        pkt (Packet): The type of packet to receive (e.g., SensorPacket, ControlPacket).
 
     Returns:
         An instance of the received packet type with the parsed data, or None if no packet is available.
     '''
-    if link.available():
+    if link.id_byte == PacketID.PACKET_SENSOR:
+        pkt = SensorPacket()
         pkt.deserialize(link)
+        return pkt
+    elif link.id_byte == PacketID.PACKET_CONTROL:
+        pkt = ControlPacket()
+        pkt.deserialize(link)
+        return pkt
 
 
 def controlRequestThread(link):
@@ -150,8 +162,8 @@ if __name__ == '__main__':
     parser.add_argument(
         "--sampling-interval",
         type=float,
-        default=0.1,
-        help="seconds to skip from start; x-axis will start at 0 after this offset",
+        default=0.001,
+        help="seconds between each check for incoming packets (default: 0.001s)",
     )
 
     args = parser.parse_args()
@@ -168,30 +180,28 @@ if __name__ == '__main__':
         transmitter_thread.start()
         print("Transmitter thread started.")
 
-        print("Recevier thread started.")
+        print("Receiver thread started.")
         lastTime = time.time()
         while True:
             if (time.time() - lastTime) > sampling_interval:
                 lastTime = time.time()
 
-                ###################################################################
-                # Wait for a response and report any errors while receiving packets
-                ###################################################################
-                while not link.available():
-                    # A negative value for status indicates an error
-                    if link.status.value < 0:
-                        if link.status == Status.CRC_ERROR:
-                            print('ERROR: CRC_ERROR')
-                        elif link.status == Status.PAYLOAD_ERROR:
-                            print('ERROR: PAYLOAD_ERROR')
-                        elif link.status == Status.STOP_BYTE_ERROR:
-                            print('ERROR: STOP_BYTE_ERROR')
-                        else:
-                            print(f'ERROR: {link.status.name}')
+                if link.available():    # reads a packet
+                    pkt = receivePacket(link)
+                    if pkt and isinstance(pkt, SensorPacket):
+                        print(f"Received Sensor Packet: {pkt.to_str()}")
+                    elif isinstance(pkt, ControlPacket):
+                        print(f"Received Control ACK for Sensor {pkt.sensor_idx}")
 
-                sensor_packet = receivePacket(link, SensorPacket())
-                if sensor_packet != SensorPacket():
-                    print(f"Received Sensor Packet: {sensor_packet}")
+                elif link.status.value < 0:
+                    if link.status == Status.CRC_ERROR:
+                        print('ERROR: CRC_ERROR')
+                    elif link.status == Status.PAYLOAD_ERROR:
+                        print('ERROR: PAYLOAD_ERROR')
+                    elif link.status == Status.STOP_BYTE_ERROR:
+                        print('ERROR: STOP_BYTE_ERROR')
+                    else:
+                        print(f'ERROR: {link.status.name}')
 
     except KeyboardInterrupt:
         try:
