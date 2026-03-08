@@ -12,6 +12,8 @@
 #define I2C_MIN_ADDRESS 0x00
 #define I2C_MAX_ADDRESS 0x7F
 
+#define I2C_STANDARD_MODE_CLOCK_FREQ 100000L
+#define I2C_FAST_MODE_CLOCK_FREQ 400000L
 
 /**
  * Selects the active channel on a TCA9548A I2C multiplexer.

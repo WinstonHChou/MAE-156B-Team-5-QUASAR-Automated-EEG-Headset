@@ -14,7 +14,8 @@ std::array<std::unique_ptr<PneumaticLoadCell>, NUM_OF_SENSOR_SLOTS> load_cells; 
 
 void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
-  Serial.begin(115200);
+  Wire.setClock(I2C_CLOCK_FREQ);
+  Serial.begin(BRIDGE_BAUDRATE);
   bridge.begin(Serial);
 
   Serial.println("MPRLS Load Cell Test");
@@ -22,27 +23,30 @@ void setup() {
 
   scanAvailableSensorOverMultipleTCAs(mux_to_valid_channels_mask);
   for (const auto& entry : mux_to_valid_channels_mask) {
-    int mux_idx = static_cast<int>(entry.first - DEFAULT_TCAADDR);
-    for (uint8_t m = entry.second; m; m &= (m - 1)) {
-      uint8_t lsb = m & -m;                       // isolate lowest set bit
-      int ch = __builtin_ctz(lsb);    // ESP32/GCC: index of that bit (0..7)
+    const uint8_t& mux_addr = entry.first;
+    const uint8_t& channels_mask = entry.second;
+    const int mux_idx = static_cast<int>(mux_addr - DEFAULT_TCAADDR);
+
+    for (uint8_t m = channels_mask; m; m &= (m - 1)) {
+      const uint8_t lsb = static_cast<uint8_t>(m & -m);   // isolate lowest set bit
+      const int ch = __builtin_ctz(lsb);                  // ESP32/GCC: index of that bit (0..7)
+      const int sensor_idx = mux_idx * 8 + ch;            // calculate the unique sensor index
 
       Serial.print("\n--- Selecting TCA9548A 0x");
-      Serial.print(entry.first, HEX);
+      Serial.print(mux_addr, HEX);
       Serial.print(" port ");
       Serial.print(ch);
       Serial.println(" ---");
-      tcaselect(ch, entry.first);
+      tcaselect(ch, mux_addr);
       if (!test_mpr.begin(MPRLS_ADDR)) {
         Serial.println("Failed to communicate with MPRLS sensor, check wiring? Please reboot after fixing.");
-        tcadisable(entry.first);
+        tcadisable(mux_addr);
         while (1) {
           delay(READING_TIMEOUT);
         }
       }
       Serial.println("Found MPRLS sensor");
-      int sensor_idx = mux_idx * 8 + ch; // calculate a unique sensor index based on mux address and channel
-      load_cells[sensor_idx] = std::move(std::unique_ptr<PneumaticLoadCell>(new PneumaticLoadCell(ch, entry.first)));
+      load_cells[sensor_idx] = std::move(std::unique_ptr<PneumaticLoadCell>(new PneumaticLoadCell(ch, mux_addr)));
 
       // Zero-load calibration
       if (load_cells[sensor_idx]) {
@@ -53,7 +57,7 @@ void setup() {
         Serial.println("Critical Error: Load cell pointer is null!");
       }
     }
-    tcadisable(entry.first);
+    tcadisable(mux_addr);
   }
 
   Serial.println("\nStarting live readings...\n");
@@ -61,24 +65,33 @@ void setup() {
 
 unsigned long lastMillis = 0;
 void loop() {
+  // Check for bridge updates (e.g. incoming control packets)
+  // if (bridge.update()) {
+
+  // }
+
+  // Read sensors at defined sampling rate
   if (millis() - lastMillis >= MPRLS_SAMPLING_INTERVAL_MS) {
     lastMillis = millis();
 
     for (const auto& entry : mux_to_valid_channels_mask) {
-      int mux_idx = static_cast<int>(entry.first - DEFAULT_TCAADDR);
-      for (uint8_t m = entry.second; m; m &= (m - 1)) {
-        uint8_t lsb = m & -m;             // isolate lowest set bit
-        int ch = __builtin_ctz(lsb);      // ESP32/GCC: index of that bit (0..7)
+      const uint8_t& mux_addr = entry.first;
+      const uint8_t& channels_mask = entry.second;
+      const int mux_idx = static_cast<int>(mux_addr - DEFAULT_TCAADDR);
 
-        int sensor_idx = mux_idx * 8 + ch; // calculate the unique sensor index
+      for (uint8_t m = channels_mask; m; m &= (m - 1)) {
+        const uint8_t lsb = static_cast<uint8_t>(m & -m);   // isolate lowest set bit
+        const int ch = __builtin_ctz(lsb);                  // ESP32/GCC: index of that bit (0..7)
+        const int sensor_idx = mux_idx * 8 + ch;            // calculate the unique sensor index
+
         Serial.print("\n--- Selecting TCA9548A 0x");
-        Serial.print(entry.first, HEX);
+        Serial.print(mux_addr, HEX);
         Serial.print(" port ");
         Serial.print(ch);
         Serial.println(" ---");
         if (!load_cells[sensor_idx]->begin()) { continue; }
 
-        // Read pressure in kPa and force in grams
+        // Read data
         float pressure_kPa = load_cells[sensor_idx]->readPressure();
         float F_g = load_cells[sensor_idx]->getForceFromPressure();
         float pressure_rate = load_cells[sensor_idx]->getPressureRate();
@@ -91,17 +104,23 @@ void loop() {
         Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor_idx); Serial.print(":"); Serial.print(pressure_rate, 4);
         Serial.println();
 
-        bridge.sendSensorPacket(
-          SensorPacket{
-            .sensor_idx = static_cast<uint8_t>(sensor_idx),
-            .sensor_pressure_kPa = pressure_kPa,
-            .sensor_pressure_rate_kPa_s = pressure_rate,
-            .sensor_force_g = F_g
-          }
-        );
+        // Send via SerialBridge
+        SensorPacket pkt;
+        pkt.sensor_idx = static_cast<uint8_t>(sensor_idx);
+        pkt.sensor_pressure_kPa = pressure_kPa;
+        pkt.sensor_pressure_rate_kPa_s = pressure_rate;
+        pkt.sensor_force_g = F_g;
+
+        bridge.sendSensorPacket(pkt);
       }
-      tcadisable(entry.first);
+      tcadisable(mux_addr);
     }
 
+    unsigned long loop_time = millis() - lastMillis;
+    if (loop_time > MPRLS_SAMPLING_INTERVAL_MS) {
+      Serial.print("Warning: Loop time ");
+      Serial.print(loop_time);
+      Serial.println("ms exceeds sampling interval!");
+    }
   }
 }

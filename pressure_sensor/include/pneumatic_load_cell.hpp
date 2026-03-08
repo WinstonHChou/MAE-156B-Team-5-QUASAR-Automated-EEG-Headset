@@ -57,6 +57,7 @@ class PneumaticLoadCell {
       prev_kPa_ = current_kPa_;
       last_timestamp_ms_ = current_timestamp_ms_;
 
+      // mpr_.readPressure() is a BLOCKING call (approx 5-8ms)
       current_kPa_ = lp_.filter(mpr_.readPressure());
       current_timestamp_ms_ = millis();
 

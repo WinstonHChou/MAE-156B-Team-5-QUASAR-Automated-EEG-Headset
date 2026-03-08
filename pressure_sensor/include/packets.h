@@ -10,6 +10,26 @@
 
 
 /**
+ * @enum PacketID
+ * @brief Identifier for packet types in serial communication protocol
+ * 
+ * Used to distinguish between different packet types transmitted over the serial link.
+ * This identifier allows the receiver to correctly interpret the packet payload.
+ * 
+ * @var CONTROL
+ *      Control/command packet (value = 0). Sent from host to microcontroller
+ *      to request operations or query status.
+ * @var SENSOR
+ *      Sensor data packet (value = 1). Sent from microcontroller to host
+ *      containing pressure and force measurements.
+ */
+enum PacketID : uint8_t {
+    CONTROL = 0x00,
+    SENSOR  = 0x01,
+};
+
+
+/**
  * @enum ControlFlags
  * @brief Bitmask flags for control packet status and responses
  * 
@@ -34,12 +54,9 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_NONE = 0,
-    REQUEST_RESET_ZERO_LOAD = 1,
-    REQUEST_CALIBRATION = 2,
-    // Add more request types as needed
+    REQUEST_RESET_ZERO_LOAD = 0x00,
+    REQUEST_CALIBRATION     = 0x01,
 };
-
 
 /**
  * @struct ControlPacket
@@ -59,9 +76,9 @@ enum RequestType : uint8_t {
  */
 typedef struct __attribute__((packed)) {
     uint8_t sensor_idx;
-    uint8_t request_idx;   // request type
-    uint8_t flags;         // bitmask: ACK/BUSY/ERR
-    uint8_t error_code;    // optional: 0 = none
+    RequestType request_idx;    // request type
+    uint8_t flags;              // bitmask: ACK/BUSY/ERR
+    uint8_t error_code;         // optional: 0 = none
 } ControlPacket;
 
 

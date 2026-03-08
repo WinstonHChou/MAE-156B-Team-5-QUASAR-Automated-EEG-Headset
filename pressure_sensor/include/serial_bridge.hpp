@@ -14,15 +14,17 @@ class SerialBridge {
     void sendSensorPacket(const SensorPacket& packet) {
       uint16_t sendSize = 0;
       sendSize = transfer_.txObj(packet, sendSize);
-      transfer_.sendData(sendSize);
+      transfer_.sendData(sendSize, SENSOR);
     }
 
     bool receiveControlPacket(ControlPacket& packet) {
       if (transfer_.available()) {
-        uint16_t recSize = 0;
-        recSize = transfer_.rxObj(packet, recSize);
-        if (recSize == sizeof(ControlPacket)) {
-          return true;
+        if (transfer_.currentPacketID() == CONTROL) {
+          uint16_t recSize = 0;
+          recSize = transfer_.rxObj(packet, recSize);
+          if (recSize == sizeof(ControlPacket)) {
+            return true;
+          }
         }
       }
       return false;
