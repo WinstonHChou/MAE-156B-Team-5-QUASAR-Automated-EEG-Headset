@@ -34,7 +34,7 @@ def controlRequestThread(bridge: SerialBridge):
     Thread function to periodically send control packets to the Arduino. This can be used
     to request sensor data or send commands at regular intervals.
     '''
-    options = [RequestType.REQUEST_RESET_ZERO_LOAD.name, RequestType.REQUEST_CALIBRATION.name]
+    options = list(RequestType.__members__.keys())
     min_val = 0
     max_val = 31
 

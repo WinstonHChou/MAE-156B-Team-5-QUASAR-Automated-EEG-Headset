@@ -54,8 +54,16 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_RESET_ZERO_LOAD = 0x00,
-    REQUEST_CALIBRATION     = 0x01,
+    REQUEST_RESET_ZERO_LOAD     = 0x00,
+    REQUEST_CALIBRATION_START   = 0x01,
+    REQUEST_CALIBRATION_END     = 0x02,
+};
+
+enum ErrorCode : uint8_t {
+    ERR_NONE                    = 0x00,
+    ERR_INVALID_REQUEST         = 0x01,
+    ERR_SENSOR_FAILURE          = 0x02,
+    // Add more error codes as needed
 };
 
 /**

@@ -61,10 +61,40 @@ uint8_t prev_mux_addr = TCAADDR_ADDRESSES[0];
 void loop() {
   // Check for bridge requests from host, which are sent as ControlPackets.
   ControlPacket pkt;
-  if (bridge.receive(pkt)) {
-    pkt.flags = CTRL_ACK; // For demonstration, we simply ACK any received control packet. In a real implementation, you would process the request and set flags/error codes accordingly.
+  if (bridge.receive(pkt) && pkt.sensor_idx < NUM_OF_SENSOR_SLOTS && load_cells[pkt.sensor_idx]) {
+
+    pkt.flags |= CTRL_ACK; // Acknowledge receipt of the control packet
+    switch (load_cells[pkt.sensor_idx]->getStatus()) {
+      case PneumaticLoadCell::OK:
+        pkt.flags |= 0; // no additional flags
+        break;
+      case PneumaticLoadCell::BUSY:
+        pkt.flags |= CTRL_BUSY;
+        break;
+      case PneumaticLoadCell::FAILURE:
+        pkt.flags |= CTRL_ERR;
+        pkt.error_code = ERR_SENSOR_FAILURE;
+        break;
+    }
+
+    switch (pkt.request_idx) {
+      case REQUEST_RESET_ZERO_LOAD:
+        if (load_cells[pkt.sensor_idx]->getStatus() == PneumaticLoadCell::OK) {
+          load_cells[pkt.sensor_idx]->resetZeroLoad();
+        } else {
+          pkt.flags |= CTRL_ERR; // Cannot perform zero load reset if sensor is not in OK status
+          pkt.error_code = ERR_INVALID_REQUEST;
+        }
+        break;
+      case REQUEST_CALIBRATION_START:
+        load_cells[pkt.sensor_idx]->setToCalibrationMode();
+        break;
+      case REQUEST_CALIBRATION_END:
+        load_cells[pkt.sensor_idx]->setToNormalMode();
+        break;
+    }
+
     bridge.send(pkt); // Echo back the received control packet for confirmation
-    // TODO: Add logic here to handle different request types and perform actions on the sensors as needed (e.g., reset zero load, recalibrate, etc.)
   }
 
   // Read sensors at defined sampling rate
