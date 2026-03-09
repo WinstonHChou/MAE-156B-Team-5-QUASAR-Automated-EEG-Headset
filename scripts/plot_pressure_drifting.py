@@ -6,15 +6,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-def air_diffusion_model(t, P0, k):
+def air_diffusion_model(dt, P_k, P_amb, k):
     """
     Simple exponential decay model for pressure drifting due to air diffusion.
-    P(t) = P0 * exp(-k * t)
+    P_k1 = P_k - k * (P_k - P_amb) * dt
     where:
-        P0 = initial pressure at t=0
+        P_amb = ambient pressure
         k = diffusion rate constant (higher k means faster drifting)
     """
-    return P0 * np.exp(-k * t)
+    return P_k - k * (P_k - P_amb) * dt
 
 
 def main():
@@ -38,8 +38,10 @@ def main():
     fig, ax = plt.subplots(figsize=(8, 6))
     (line,) = ax.plot([], [], linewidth=2, label="Pressure (kPa)")
     line2 = None
+    line_sim = None
     if second_csv_path:
         (line2,) = ax.plot([], [], linewidth=2, color="tab:orange", label="Ambient Pressure (kPa)")
+        (line_sim,) = ax.plot([], [], linewidth=2, color="tab:green", linestyle="--", label="Air Diffusion Model (kPa)")
 
     fig.suptitle(f"Pressure vs Time:\n{prefix}\n{csv_path.stem}" if prefix else f"Pressure vs Time:\n{csv_path.stem}")
 
@@ -79,6 +81,17 @@ def main():
     x2data = x2.to_numpy() if x2 is not None else np.array([])
     y2data = y2.to_numpy() if y2 is not None else np.array([])
     y2data = np.interp(xdata, x2data, y2data) if x2data.size and y2data.size else np.full_like(xdata, np.nan)
+    ydata_sim = []
+    if xdata.size and ydata.size and y2data.size:
+        k = 0.00015  # diffusion rate constant, adjust as needed
+        P_k = np.max(ydata)
+        for i in range(len(xdata)):
+            dt = xdata[i] - xdata[i - 1] if i > 0 else 0
+            P_amb = y2data[i]
+            P_k = air_diffusion_model(dt, P_k, P_amb, k)
+            ydata_sim.append(P_k)
+    else:
+        ydata_sim = np.full_like(xdata, np.nan)
 
     # ensure arrays match lengths to avoid broadcasting errors
     if ydata.shape != xdata.shape:
@@ -89,7 +102,8 @@ def main():
     line.set_data(xdata, ydata)
     if line2 is not None:
         line2.set_data(xdata, y2data)
-
+    if line_sim is not None:
+        line_sim.set_data(xdata, ydata_sim)
     ax.relim()
     ax.autoscale_view()
     plt.show()
