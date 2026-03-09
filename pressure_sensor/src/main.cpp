@@ -59,10 +59,13 @@ void setup() {
 unsigned long lastMillis = 0;
 uint8_t prev_mux_addr = TCAADDR_ADDRESSES[0];
 void loop() {
-  // Check for bridge updates (e.g. incoming control packets)
-  // if (bridge.update()) {
-
-  // }
+  // Check for bridge requests from host, which are sent as ControlPackets.
+  ControlPacket pkt;
+  if (bridge.receive(pkt)) {
+    pkt.flags = CTRL_ACK; // For demonstration, we simply ACK any received control packet. In a real implementation, you would process the request and set flags/error codes accordingly.
+    bridge.send(pkt); // Echo back the received control packet for confirmation
+    // TODO: Add logic here to handle different request types and perform actions on the sensors as needed (e.g., reset zero load, recalibrate, etc.)
+  }
 
   // Read sensors at defined sampling rate
   if (millis() - lastMillis >= MPRLS_SAMPLING_INTERVAL_MS) {
@@ -106,7 +109,7 @@ void loop() {
         pkt.sensor_pressure_rate_kPa_s = pressure_rate;
         pkt.sensor_force_g = F_g;
 
-        bridge.sendSensorPacket(pkt);
+        bridge.send(pkt);
 
         if (sensor->getMuxAddress() != prev_mux_addr) {
           tcadisable(sensor->getMuxAddress());

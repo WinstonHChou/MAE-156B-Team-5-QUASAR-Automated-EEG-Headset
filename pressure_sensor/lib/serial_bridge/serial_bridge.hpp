@@ -11,17 +11,23 @@ class SerialBridge {
       transfer_.begin(_port);
     }
 
-    void sendSensorPacket(const SensorPacket& packet) {
+    void send(const SensorPacket& pkt) {
       uint16_t sendSize = 0;
-      sendSize = transfer_.txObj(packet, sendSize);
+      sendSize = transfer_.txObj(pkt, sendSize);
       transfer_.sendData(sendSize, SENSOR);
     }
 
-    bool receiveControlPacket(ControlPacket& packet) {
+    void send(const ControlPacket& pkt) {
+      uint16_t sendSize = 0;
+      sendSize = transfer_.txObj(pkt, sendSize);
+      transfer_.sendData(sendSize, CONTROL);
+    }
+
+    bool receive(ControlPacket& pkt) {
       if (transfer_.available()) {
         if (transfer_.currentPacketID() == CONTROL) {
           uint16_t recSize = 0;
-          recSize = transfer_.rxObj(packet, recSize);
+          recSize = transfer_.rxObj(pkt, recSize);
           if (recSize == sizeof(ControlPacket)) {
             return true;
           }

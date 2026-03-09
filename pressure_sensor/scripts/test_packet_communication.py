@@ -26,16 +26,9 @@ class RequestType(IntFlag):
     REQUEST_CALIBRATION     = 0x01
 
 class Packet(ABC):
-    def __init__(self):
-        self.sensor_idx = 0
-
+    @abstractmethod
     def serialize(self, link):
-        keys = self.__dict__.keys()
-        sendSize = 0
-        for k in keys:
-            v = self.__dict__[k]
-            sendSize = link.tx_obj(v, start_pos=sendSize)
-        return sendSize
+        pass
 
     @abstractmethod
     def deserialize(self, link):
@@ -48,9 +41,17 @@ class ControlPacket(Packet):
     def __init__(self):
         super().__init__()
         self.sensor_idx = 0
-        self.request_idx = int(RequestType.REQUEST_NONE)
-        self.flags = int(0)
-        self.error_code = int(0)
+        self.request_idx = RequestType.REQUEST_CALIBRATION
+        self.flags = 0
+        self.error_code = 0
+
+    def serialize(self, link):
+        sendSize = 0
+        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.request_idx, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.flags, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.error_code, start_pos=sendSize, val_type_override='b')
+        return sendSize
     
     def deserialize(self, link):
         recSize = 0
@@ -70,6 +71,14 @@ class SensorPacket(Packet):
         self.sensor_pressure_rate_kPa_s = float(0.0)
         self.sensor_force_g = float(0.0)
 
+    def serialize(self, link):
+        sendSize = 0
+        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.sensor_pressure_kPa, start_pos=sendSize, val_type_override='f')
+        sendSize = link.tx_obj(self.sensor_pressure_rate_kPa_s, start_pos=sendSize, val_type_override='f')
+        sendSize = link.tx_obj(self.sensor_force_g, start_pos=sendSize, val_type_override='f')
+        return sendSize
+
     def deserialize(self, link):
         recSize = 0
         self.sensor_idx = link.rx_obj(obj_type='b', start_pos=recSize)
@@ -79,6 +88,70 @@ class SensorPacket(Packet):
         self.sensor_pressure_rate_kPa_s = link.rx_obj(obj_type='f', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['f']
         self.sensor_force_g = link.rx_obj(obj_type='f', start_pos=recSize)
+
+class SerialBridge:
+    def __init__(self, port, baud=BAUD):
+        self.link = SerialTransfer(port, baud=BAUD)
+
+        self.link.open()
+        time.sleep(2) # allow some time for the Arduino to completely reset
+
+    def getTransfer(self):
+        return self.link
+
+    def send(self, pkt: Packet):
+        '''
+        Helper function to send a control packet to the Arduino. The control packet
+        is defined in the packets.h file on the Arduino and is used to send commands
+        or requests from the Python script to the Arduino.
+        
+        Parameters:
+            pkt (Packet): The packet to send.
+        '''
+
+        if type(pkt) == ControlPacket:
+            packet_id = PacketID.PACKET_CONTROL
+        elif type(pkt) == SensorPacket:
+            packet_id = PacketID.PACKET_SENSOR
+        else:
+            packet_id = 0   # Default to 0
+        # Serialize and send packet
+        send_size = pkt.serialize(self.link)
+        self.link.send(send_size, packet_id)
+
+    def receive(self, pkt=None):
+        '''
+        Helper function to receive a packet from the Arduino. The packet type can be
+        specified to determine how to parse the incoming data.
+
+        Returns:
+            An instance of the received packet type with the parsed data, or None if no packet is available.
+        '''
+        if self.link.available():    # reads a packet
+
+            if self.link.status.value < 0:
+                if self.link.status == Status.CRC_ERROR:
+                    print('ERROR: CRC_ERROR')
+                elif self.link.status == Status.PAYLOAD_ERROR:
+                    print('ERROR: PAYLOAD_ERROR')
+                elif self.link.status == Status.STOP_BYTE_ERROR:
+                    print('ERROR: STOP_BYTE_ERROR')
+                else:
+                    print(f'ERROR: {self.link.status.name}')
+
+            if self.link.id_byte == PacketID.PACKET_SENSOR:
+                pkt = SensorPacket()
+                pkt.deserialize(self.link)
+                # print(f"Received Sensor Packet: {pkt.to_str()}")
+                return pkt
+            elif self.link.id_byte == PacketID.PACKET_CONTROL:
+                pkt = ControlPacket()
+                pkt.deserialize(self.link)
+                if pkt.flags & ControlFlags.CTRL_ACK:
+                    print(f"Received Control ACK for Sensor {pkt.sensor_idx} with request {RequestType(pkt.request_idx).name}")
+                return pkt
+
+
 
 def terminal_menu(choices, title="Select an option"):
     choices_with_caption = [title] + [str(c) for c in choices]
@@ -98,59 +171,40 @@ def autodetect_port():
     idx = int(input("Select port index: "))
     return ports[idx].device
 
-
-def sendPacket(link, pkt: Packet):
-    '''
-    Helper function to send a control packet to the Arduino. The control packet
-    is defined in the packets.h file on the Arduino and is used to send commands
-    or requests from the Python script to the Arduino.
-    
-    Parameters:
-        link (SerialTransfer): The SerialTransfer link object used for communication.
-        pkt (Packet): The packet to send.
-    '''
-
-    # Serialize and send the control packet
-    send_size = pkt.serialize(link)
-    link.send(send_size)
-
-def receivePacket(link):
-    '''
-    Helper function to receive a packet from the Arduino. The packet type can be
-    specified to determine how to parse the incoming data.
-    
-    Parameters:
-        link (SerialTransfer): The SerialTransfer link object used for communication.
-
-    Returns:
-        An instance of the received packet type with the parsed data, or None if no packet is available.
-    '''
-    if link.id_byte == PacketID.PACKET_SENSOR:
-        pkt = SensorPacket()
-        pkt.deserialize(link)
-        return pkt
-    elif link.id_byte == PacketID.PACKET_CONTROL:
-        pkt = ControlPacket()
-        pkt.deserialize(link)
-        return pkt
-
-
-def controlRequestThread(link):
+def controlRequestThread(bridge: SerialBridge):
     '''
     Thread function to periodically send control packets to the Arduino. This can be used
     to request sensor data or send commands at regular intervals.
     '''
-    options = [RequestType.REQUEST_CALIBRATION, RequestType.REQUEST_RESET_ZERO_LOAD]
+    options = [RequestType.REQUEST_RESET_ZERO_LOAD.name, RequestType.REQUEST_CALIBRATION.name]
+    min_val = 0
+    max_val = 31
 
     while True:
-        request = terminal_menu(options, title="Select a control request to send:")
+        request_mask = terminal_menu(options, title="Select a control request to send:")
+        while True:
+            user_input = input(f"Enter a sensor index (enter a number between {min_val} and {max_val}): ")
+            try:
+                # Convert input to an integer
+                number = int(user_input)
+                
+                # Check if the number is within the valid range
+                if min_val <= number <= max_val:
+                    break # Exit the loop if valid
+                else:
+                    print("Invalid integer. The number must be in the specified range.")
+            except ValueError:
+                # Handle the error if the input cannot be converted to an integer
+                print("Invalid input. Please enter a whole number.")
+
         pkt = ControlPacket()
-        pkt.sensor_idx = 0  # example sensor index
-        pkt.request_idx = request
-        sendPacket(link, pkt)
+        pkt.sensor_idx = number
+        pkt.request_idx = RequestType[request_mask].value
+        bridge.send(pkt)
+
+        print(f"Sending Control Packet - Sensor Index: {pkt.sensor_idx}, Request Type: {RequestType(pkt.request_idx).name}")
         time.sleep(5)
 
-            
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -171,12 +225,9 @@ if __name__ == '__main__':
 
     port = autodetect_port()
     try:
-        link = SerialTransfer(port, baud=BAUD)
-
-        link.open()
-        time.sleep(2) # allow some time for the Arduino to completely reset
-
-        transmitter_thread = threading.Thread(target=controlRequestThread, args=(link,), daemon=True)
+        bridge = SerialBridge(port)
+        
+        transmitter_thread = threading.Thread(target=controlRequestThread, args=(bridge,), daemon=True)
         transmitter_thread.start()
         print("Transmitter thread started.")
 
@@ -186,26 +237,11 @@ if __name__ == '__main__':
             if (time.time() - lastTime) > sampling_interval:
                 lastTime = time.time()
 
-                if link.available():    # reads a packet
-                    pkt = receivePacket(link)
-                    if pkt and isinstance(pkt, SensorPacket):
-                        print(f"Received Sensor Packet: {pkt.to_str()}")
-                    elif isinstance(pkt, ControlPacket):
-                        print(f"Received Control ACK for Sensor {pkt.sensor_idx}")
-
-                elif link.status.value < 0:
-                    if link.status == Status.CRC_ERROR:
-                        print('ERROR: CRC_ERROR')
-                    elif link.status == Status.PAYLOAD_ERROR:
-                        print('ERROR: PAYLOAD_ERROR')
-                    elif link.status == Status.STOP_BYTE_ERROR:
-                        print('ERROR: STOP_BYTE_ERROR')
-                    else:
-                        print(f'ERROR: {link.status.name}')
+                pkt = bridge.receive()
 
     except KeyboardInterrupt:
         try:
-            link.close()
+            bridge.getTransfer().close()
         except:
             pass
     
@@ -214,6 +250,6 @@ if __name__ == '__main__':
         traceback.print_exc()
         
         try:
-            link.close()
+            bridge.getTransfer().close()
         except:
             pass
