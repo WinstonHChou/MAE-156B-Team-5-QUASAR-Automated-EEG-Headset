@@ -94,13 +94,16 @@ void loop() {
         float F_g = sensor->getForceFromPressure();
         float pressure_rate = sensor->getPressureRate();
 
-        // Serial Logging
-        // Serial.print(">");
-        // Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
-        // Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
-        // Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
-        // Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
-        // Serial.println();
+        // Debug Serial Logging
+        #ifdef DEBUG_SERIAL
+        Serial.println();
+        Serial.print(">");
+        Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
+        Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
+        Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
+        Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
+        Serial.println();
+        #endif
 
         // Send via SerialBridge
         SensorPacket pkt;
