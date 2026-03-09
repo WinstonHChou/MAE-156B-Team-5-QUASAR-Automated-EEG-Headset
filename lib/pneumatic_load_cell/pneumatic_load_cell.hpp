@@ -2,11 +2,11 @@
 
 #include "config.h"
 #include "tca9548a.h"
+#include "mprls0025pa00001a.hpp"
 
 #include <map>
 #include <iterator>
 #include <limits>
-#include <Adafruit_MPRLS.h>
 #include <Iir.h>
 
 #define MPRLS_ADDR MPRLS_DEFAULT_ADDR
@@ -32,16 +32,28 @@ double interp_clamp(const std::map<double,double>& m, double x) {
 // Pneumatic Load Cell
 class PneumaticLoadCell {
   public:
-    PneumaticLoadCell(uint8_t channel, uint8_t mux_addr)
-      : ch_(channel), mux_(mux_addr) {
+    PneumaticLoadCell(uint8_t channel, uint8_t mux_addr, uint8_t sensor_idx)
+      : ch_(channel), mux_(mux_addr), sensor_idx_(sensor_idx) {
       lp_.setup(MPRLS_SAMPLING_RATE_HZ, LOWPASS_CUTOFF_FREQ_HZ);
+    }
+
+    uint8_t getMuxAddress() const {
+      return mux_;
+    }
+
+    uint8_t getChannel() const {
+      return ch_;
+    }
+
+    uint8_t getSensorIndex() const {
+      return sensor_idx_;
     }
 
     // Read pressure from the sensor
     boolean begin() {
       tcaselect(ch_, mux_);
       if (!mpr_.begin(MPRLS_ADDR)) {
-        Serial.println("Failed to communicate with MPRLS sensor, check wiring?");
+        Serial.println("Failed to communicate with MPRLS sensor, check wiring? Please reboot after fixing.");
         delay(READING_TIMEOUT);
         return false;
       }
@@ -53,11 +65,20 @@ class PneumaticLoadCell {
       tcadisable(mux_);
     }
 
+    void requestMeasurement() {
+      tcaselect(ch_, mux_);
+      mpr_.requestData();
+    }
+
     float readPressure() {
+      tcaselect(ch_, mux_);
+
       prev_kPa_ = current_kPa_;
       last_timestamp_ms_ = current_timestamp_ms_;
 
-      current_kPa_ = lp_.filter(mpr_.readPressure());
+      // mpr_.readPressure() is a BLOCKING call (approx 5-8ms)
+      const uint32_t& raw_val = mpr_.readData(buffer_);
+      current_kPa_ = lp_.filter(mpr_.convertToPressure(raw_val));
       current_timestamp_ms_ = millis();
 
       // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
@@ -86,24 +107,20 @@ class PneumaticLoadCell {
 
     // Calibration procedure
     void resetZeroLoad() {
-      zero_kPa_ = mpr_.readPressure();
+      requestMeasurement();
+      delay(5); // Wait for the sensor to finish
+      // readData needs a buffer; we can use the class member buffer_
+      uint32_t raw = mpr_.readData(buffer_); 
+      zero_kPa_ = mpr_.convertToPressure(raw);
     }
 
-    // void calibrateForceToSensorRatio(float known_force_grams) {
-    //   float pressure_kPa = mpr_.readPressure();
-    //   if (pressure_kPa > zero_kPa_) {
-    //     ratio_ = known_force_grams / (pressure_kPa - zero_kPa_);
-    //   }
-    // }
-
   private:
-    Adafruit_MPRLS mpr_ = Adafruit_MPRLS(RESET_PIN, EOC_PIN,
-                                         0, 25,
-                                         10, 90,
-                                         PSI_to_KPA);
+    uint8_t buffer_[4]; // buffer to hold raw data from sensor
+    mprls0025pa00001a mpr_ = mprls0025pa00001a();
     Iir::Butterworth::LowPass<2> lp_;
     uint8_t ch_;           // Channel number
     uint8_t mux_;          // Multiplexer address
+    uint8_t sensor_idx_;    // Sensor index for packet communication
     // std::map<double, double> calibration_map_; // Map of <pressure (kPa), force (grams)>
 
     float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)

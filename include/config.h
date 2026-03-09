@@ -7,18 +7,25 @@
 #define SDA_PIN     22  // not ESP32 default SDA pin (21), it's reversed on the breakout board, so we have to specify it here
 #define SCL_PIN     21  // not ESP32 default SCL pin (22), it's reversed on the breakout board, so we have to specify it here
 
-// 2. The Addressing Logic
-#define TCAADDR_ADDRESSES {0x70, 0x71, 0x72, 0x73}
-constexpr uint8_t TCA_LIST[] = TCAADDR_ADDRESSES;
+// 2. Communication Parameters
+#define I2C_MIN_ADDRESS 0x00
+#define I2C_MAX_ADDRESS 0x7F
+#define I2C_STANDARD_MODE_CLOCK_FREQ 100000L
+#define I2C_FAST_MODE_CLOCK_FREQ 400000L
 
-#define NUM_OF_SENSOR_SLOTS (sizeof(TCA_LIST) / sizeof(TCA_LIST[0]) * 8)
+#define I2C_CLOCK_FREQ I2C_FAST_MODE_CLOCK_FREQ
+#define BRIDGE_BAUDRATE 115200
 
-// 3. Timing & Filtering
+// 3. The Addressing Logic
+constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
+#define NUM_OF_SENSOR_SLOTS (sizeof(TCAADDR_ADDRESSES) / sizeof(TCAADDR_ADDRESSES[0]) * 8)
+
+// 4. Timing & Filtering
 #define MPRLS_SAMPLING_INTERVAL_MS   10
 #define MPRLS_SAMPLING_RATE_HZ       (1000.0f / MPRLS_SAMPLING_INTERVAL_MS)
 #define READING_TIMEOUT              10
 
-// 4. Physics & Calibration
+// 5. Physics & Calibration
 #define LOWPASS_ORDER                2
 #define LOWPASS_CUTOFF_FREQ_HZ       3.0f
 #define FORCE_TO_SENSOR_RATIO        56.436f

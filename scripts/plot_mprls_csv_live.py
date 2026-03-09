@@ -10,7 +10,7 @@ from estimator_pipeline_simulator import EstimatorPipelineSimulator, GRAMS_TO_NE
 
 # if False, will use pressure_rate_kpa_s column if present;
 # if True, will calculate rate from pressure_kpa column regardless of presence of pressure_rate_kpa_s column
-USE_RAW_PRESSURE_TO_CALCULATE_RATE = True
+USE_RAW_PRESSURE_TO_CALCULATE_RATE = False
 # FORCE_CORRECTION_FACTOR = 0.2 # empirical correction factor for 12mmx15mm
 FORCE_CORRECTION_FACTOR = 1.0 # empirical correction factor for 15mmx16mm
 
