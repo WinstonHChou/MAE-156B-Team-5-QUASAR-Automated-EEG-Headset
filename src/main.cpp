@@ -1,0 +1,129 @@
+#include "config.h"
+#include "tca9548a.h"
+#include "pneumatic_load_cell.hpp"
+#include "serial_bridge.hpp"
+
+#include <memory>
+#include <array>
+
+
+SerialBridge bridge = SerialBridge();
+
+// Load cell objects and mapping of mux addresses to valid channel bitmasks will be populated in setup() after scanning for devices;
+std::array<std::unique_ptr<PneumaticLoadCell>, NUM_OF_SENSOR_SLOTS> load_cells; // List of load cells corresponding to detected sensors
+
+void setup() {
+  Wire.begin(SDA_PIN, SCL_PIN);
+  Wire.setClock(I2C_CLOCK_FREQ);
+  Serial.begin(BRIDGE_BAUDRATE);
+  bridge.begin(Serial);
+
+  Serial.println("MPRLS Load Cell Test");
+  Serial.println("--------------------------------");
+
+  std::map<uint8_t, uint8_t> mux_to_valid_channels_mask; // Map of mux address to bitmask of valid channels
+  scanAvailableSensorOverMultipleTCAs(MPRLS_ADDR, mux_to_valid_channels_mask);
+  for (const auto& entry : mux_to_valid_channels_mask) {
+    const uint8_t& mux_addr = entry.first;
+    const uint8_t& channels_mask = entry.second;
+    const int mux_idx = static_cast<int>(mux_addr - DEFAULT_TCAADDR);
+
+    for (uint8_t m = channels_mask; m; m &= (m - 1)) {
+      const uint8_t lsb = static_cast<uint8_t>(m & -m);   // isolate lowest set bit
+      const int ch = __builtin_ctz(lsb);                  // ESP32/GCC: index of that bit (0..7)
+      const int sensor_idx = mux_idx * 8 + ch;            // calculate the unique sensor index
+
+      Serial.print("\n--- Selecting TCA9548A 0x");
+      Serial.print(mux_addr, HEX);
+      Serial.print(" port ");
+      Serial.print(ch);
+      Serial.println(" ---");
+
+      std::unique_ptr<PneumaticLoadCell> sensor = std::unique_ptr<PneumaticLoadCell>(new PneumaticLoadCell(ch, mux_addr, sensor_idx));
+      if (sensor->begin()) {
+        // Zero-load calibration
+        sensor->resetZeroLoad();
+        Serial.println("Zero load reset complete.");
+
+        // Store the sensor object in the load_cells array at the index corresponding to its unique sensor index
+        load_cells[sensor_idx] = std::move(sensor);
+        Serial.println("Sensor initialized.");
+      }
+    }
+    tcadisable(mux_addr);
+  }
+
+  Serial.println("\nStarting live readings...\n");
+}
+
+unsigned long lastMillis = 0;
+uint8_t prev_mux_addr = TCAADDR_ADDRESSES[0];
+void loop() {
+  // Check for bridge requests from host, which are sent as ControlPackets.
+  ControlPacket pkt;
+  if (bridge.receive(pkt)) {
+    pkt.flags = CTRL_ACK; // For demonstration, we simply ACK any received control packet. In a real implementation, you would process the request and set flags/error codes accordingly.
+    bridge.send(pkt); // Echo back the received control packet for confirmation
+    // TODO: Add logic here to handle different request types and perform actions on the sensors as needed (e.g., reset zero load, recalibrate, etc.)
+  }
+
+  // Read sensors at defined sampling rate
+  if (millis() - lastMillis >= MPRLS_SAMPLING_INTERVAL_MS) {
+    lastMillis = millis();
+
+    // STEP 1: Broadcast "Start" to all sensors
+    for (auto& sensor : load_cells) {
+      if (sensor) {
+        sensor->requestMeasurement();
+        if (sensor->getMuxAddress() != prev_mux_addr) {
+          tcadisable(sensor->getMuxAddress());
+          prev_mux_addr = sensor->getMuxAddress();
+        }
+      }
+    }
+
+    // STEP 2: Wait once for the longest conversion time (typ 5ms)
+    // During this time, every sensor is busy-calculating pressure.
+    delay(5);
+
+    // STEP 3: Collect data and send via SerialTransfer
+    for (auto& sensor : load_cells) {
+      if (sensor) {
+        // Read data
+        float pressure_kPa = sensor->readPressure();
+        float F_g = sensor->getForceFromPressure();
+        float pressure_rate = sensor->getPressureRate();
+
+        // Serial Logging
+        // Serial.print(">");
+        // Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
+        // Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
+        // Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
+        // Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
+        // Serial.println();
+
+        // Send via SerialBridge
+        SensorPacket pkt;
+        pkt.sensor_idx = sensor->getSensorIndex();
+        pkt.sensor_pressure_kPa = pressure_kPa;
+        pkt.sensor_pressure_rate_kPa_s = pressure_rate;
+        pkt.sensor_force_g = F_g;
+
+        bridge.send(pkt);
+
+        if (sensor->getMuxAddress() != prev_mux_addr) {
+          tcadisable(sensor->getMuxAddress());
+          prev_mux_addr = sensor->getMuxAddress();
+        }
+      }
+    }
+
+    unsigned long loop_time = millis() - lastMillis;
+    // Serial.println(loop_time);
+    if (loop_time > MPRLS_SAMPLING_INTERVAL_MS) {
+      Serial.print("Warning: Loop time ");
+      Serial.print(loop_time);
+      Serial.println("ms exceeds sampling interval!");
+    }
+  }
+}

@@ -1,1 +1,5 @@
-# MAE-156B-Team-5-QUASAR-Automated-EEG-Headset
+# Pneumatic-Load-Cell
+C++ arduino driver component for our custom Pneumatic Load Cell.
+
+## Acknowledgment
+This repository uses [] as fundamental libraries.
