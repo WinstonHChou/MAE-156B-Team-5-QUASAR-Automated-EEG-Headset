@@ -83,8 +83,8 @@ def main():
     y2data = np.interp(xdata, x2data, y2data) if x2data.size and y2data.size else np.full_like(xdata, np.nan)
     ydata_sim = []
     if xdata.size and ydata.size and y2data.size:
-        k = 0.00015  # diffusion rate constant, adjust as needed
-        P_k = np.max(ydata)
+        k = 0.000125  # diffusion rate constant, adjust as needed
+        P_k = ydata[1000]
         for i in range(len(xdata)):
             dt = xdata[i] - xdata[i - 1] if i > 0 else 0
             P_amb = y2data[i]
