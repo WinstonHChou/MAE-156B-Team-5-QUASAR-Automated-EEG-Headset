@@ -58,6 +58,7 @@ def controlRequestThread(bridge: SerialBridge):
         pkt = ControlPacket()
         pkt.sensor_idx = number
         pkt.request_idx = RequestType[request_mask].value
+        pkt.payload = 0
         bridge.send(pkt)
 
         print(f"Sending Control Packet - Sensor Index: {pkt.sensor_idx}, Request Type: {RequestType(pkt.request_idx).name}")

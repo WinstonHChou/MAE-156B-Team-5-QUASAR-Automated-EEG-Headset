@@ -42,6 +42,7 @@ class ControlPacket(Packet):
         self.request_idx = RequestType.REQUEST_RESET_ZERO_LOAD
         self.flags = 0
         self.error_code = ErrorCode.ERR_NONE
+        self.payload = 0
 
     def serialize(self, link):
         sendSize = 0
@@ -49,6 +50,7 @@ class ControlPacket(Packet):
         sendSize = link.tx_obj(self.request_idx, start_pos=sendSize, val_type_override='b')
         sendSize = link.tx_obj(self.flags, start_pos=sendSize, val_type_override='b')
         sendSize = link.tx_obj(self.error_code, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.payload, start_pos=sendSize, val_type_override='l')
         return sendSize
     
     def deserialize(self, link):
@@ -60,6 +62,8 @@ class ControlPacket(Packet):
         self.flags = link.rx_obj(obj_type='b', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['b']
         self.error_code = link.rx_obj(obj_type='b', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['b']
+        self.payload = link.rx_obj(obj_type='l', start_pos=recSize)
 
 class SensorPacket(Packet):
     def __init__(self):

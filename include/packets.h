@@ -91,6 +91,7 @@ typedef struct __attribute__((packed)) {
     RequestType request_idx;    // request type
     uint8_t flags;              // bitmask: ACK/BUSY/ERR
     uint8_t error_code;         // optional: 0 = none
+    uint32_t payload;
 } ControlPacket;
 
 
