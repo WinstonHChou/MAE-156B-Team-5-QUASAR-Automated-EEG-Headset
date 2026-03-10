@@ -116,6 +116,16 @@ typedef struct __attribute__((packed)) {
     float sensor_force_g;
 } SensorPacket;
 
+/** @struct WatchdogPacket
+ * @brief Watchdog/status packet sent from microcontroller to host
+ * 
+ * Contains system status information such as loop timing and overrun.
+ * 
+ * @var overrun
+ *      Flag indicating if an overrun occurred (1 = overrun, 0 = no overrun)
+ * @var loop_time_ms
+ *      Time taken for the main loop in milliseconds
+ */
 typedef struct __attribute__((packed)) {
     uint8_t overrun;
     uint32_t loop_time_ms;
