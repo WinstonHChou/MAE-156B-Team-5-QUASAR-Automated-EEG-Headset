@@ -40,9 +40,11 @@ def main():
     fig, ax = plt.subplots(figsize=(8, 6))
     (line,) = ax.plot([], [], linewidth=2, label="Pressure (kPa)")
     line2 = None
+    line_est = None
     line_sim = None
     if second_csv_path:
         (line2,) = ax.plot([], [], linewidth=2, color="tab:orange", label="Ambient Pressure (kPa)")
+        (line_est,) = ax.plot([], [], linewidth=2, color="tab:purple", linestyle=":", label="Estimated Pressure (kPa)")
         if ENABLE_SIM:
             (line_sim,) = ax.plot([], [], linewidth=2, color="tab:green", linestyle="--", label="Air Diffusion Model (kPa)")
 
@@ -84,14 +86,17 @@ def main():
     x2data = x2.to_numpy() if x2 is not None else np.array([])
     y2data = y2.to_numpy() if y2 is not None else np.array([])
     y2data = np.interp(xdata, x2data, y2data) if x2data.size and y2data.size else np.full_like(xdata, np.nan)
+    ydata_est = []
     ydata_sim = []
     if xdata.size and ydata.size and y2data.size:
         k = 0.000125  # diffusion rate constant, adjust as needed
+        dt = np.diff(xdata, prepend=xdata[0])  # time differences between samples
+        drift = np.cumsum(k * dt * (ydata - y2data))
+        ydata_est = ydata + drift  # estimated pressure without drifting
         P_k = ydata[1000]
         for i in range(len(xdata)):
-            dt = xdata[i] - xdata[i - 1] if i > 0 else 0
             P_amb = y2data[i]
-            P_k = air_diffusion_model(dt, P_k, P_amb, k)
+            P_k = air_diffusion_model(dt[i], P_k, P_amb, k)
             ydata_sim.append(P_k)
     else:
         ydata_sim = np.full_like(xdata, np.nan)
@@ -105,6 +110,8 @@ def main():
     line.set_data(xdata, ydata)
     if line2 is not None:
         line2.set_data(xdata, y2data)
+    if line_est is not None:
+        line_est.set_data(xdata, ydata_est)
     if line_sim is not None and ENABLE_SIM:
         line_sim.set_data(xdata, ydata_sim)
     ax.relim()
