@@ -80,7 +80,7 @@ class PneumaticLoadCell {
       sensor_.requestData();
     }
 
-    float readPressure() {
+    void update() {
       tcaselect(ch_, mux_);
 
       prev_kPa_ = current_kPa_;
@@ -100,6 +100,9 @@ class PneumaticLoadCell {
         // Calculate drifting compensated zero load pressure
         zero_kPa_ = current_kPa_ - (current_force_g_ / ratio_);
       }
+    }
+
+    float getPressure() {
       return current_kPa_;
     }
 

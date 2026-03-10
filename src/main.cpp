@@ -119,8 +119,11 @@ void loop() {
     // STEP 3: Collect data and send via SerialTransfer
     for (auto& sensor : load_cells) {
       if (sensor) {
+        // periodic update of sensor readings;
+        sensor->update();
+
         // Read data
-        float pressure_kPa = sensor->readPressure();
+        float pressure_kPa = sensor->getPressure();
         float F_g = sensor->getForceFromPressure();
         float pressure_rate = sensor->getPressureRate();
 
