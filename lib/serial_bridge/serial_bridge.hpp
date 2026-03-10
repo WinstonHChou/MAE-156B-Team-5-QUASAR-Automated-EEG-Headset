@@ -23,6 +23,12 @@ class SerialBridge {
       transfer_.sendData(sendSize, CONTROL);
     }
 
+    void send(const WatchdogPacket& pkt) {
+      uint16_t sendSize = 0;
+      sendSize = transfer_.txObj(pkt, sendSize);
+      transfer_.sendData(sendSize, WATCHDOG);
+    }
+
     bool receive(ControlPacket& pkt) {
       if (transfer_.available()) {
         if (transfer_.currentPacketID() == CONTROL) {

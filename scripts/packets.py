@@ -4,8 +4,9 @@ from abc import ABC, abstractmethod
 from pySerialTransfer.pySerialTransfer import SerialTransfer, Status, STRUCT_FORMAT_LENGTHS
 
 class PacketID(IntFlag):
-    PACKET_CONTROL = 0x00
-    PACKET_SENSOR  = 0x01
+    CONTROL = 0x00
+    SENSOR  = 0x01
+    WATCHDOG = 0x02
 
 class ControlFlags(IntFlag):
     CTRL_ACK  = 1 << 0  # 1 = ACK, 0 = NACK
@@ -86,6 +87,25 @@ class SensorPacket(Packet):
         recSize += STRUCT_FORMAT_LENGTHS['f']
         self.sensor_force_g = link.rx_obj(obj_type='f', start_pos=recSize)
 
+class WatchdogPacket(Packet):
+    def __init__(self):
+        super().__init__()
+        self.overrun = bool(0)
+        self.loop_time_ms = int(0)
+
+    def serialize(self, link):
+        sendSize = 0
+        sendSize = link.tx_obj(self.overrun, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.loop_time_ms, start_pos=sendSize, val_type_override='l')
+        return sendSize
+
+    def deserialize(self, link):
+        recSize = 0
+        self.overrun = bool(link.rx_obj(obj_type='b', start_pos=recSize))
+        recSize += STRUCT_FORMAT_LENGTHS['b']
+        self.loop_time_ms = link.rx_obj(obj_type='l', start_pos=recSize)
+
+
 class SerialBridge:
     def __init__(self, port, baud, debug=False):
         self.link = SerialTransfer(port, baud)
@@ -108,9 +128,11 @@ class SerialBridge:
         '''
 
         if type(pkt) == ControlPacket:
-            packet_id = PacketID.PACKET_CONTROL
+            packet_id = PacketID.CONTROL
         elif type(pkt) == SensorPacket:
-            packet_id = PacketID.PACKET_SENSOR
+            packet_id = PacketID.SENSOR
+        elif type(pkt) == WatchdogPacket:
+            packet_id = PacketID.WATCHDOG
         else:
             packet_id = 0   # Default to 0
         # Serialize and send packet
@@ -137,15 +159,20 @@ class SerialBridge:
                 else:
                     print(f'ERROR: {self.link.status.name}')
 
-            if self.link.id_byte == PacketID.PACKET_SENSOR:
+            if self.link.id_byte == PacketID.SENSOR:
                 pkt = SensorPacket()
                 pkt.deserialize(self.link)
                 if self.debug:
                     print(f"Received Sensor Packet: {pkt.to_str()}")
                 return pkt
-            elif self.link.id_byte == PacketID.PACKET_CONTROL:
+            elif self.link.id_byte == PacketID.CONTROL:
                 pkt = ControlPacket()
                 pkt.deserialize(self.link)
                 if pkt.flags & ControlFlags.CTRL_ACK:
                     print(f"Received Control ACK for Sensor {pkt.sensor_idx} with request {RequestType(pkt.request_idx).name}")
+                return pkt
+            elif self.link.id_byte == PacketID.WATCHDOG:
+                pkt = WatchdogPacket()
+                pkt.deserialize(self.link)
+                print(f"Received Watchdog Packet: {pkt.to_str()}")
                 return pkt

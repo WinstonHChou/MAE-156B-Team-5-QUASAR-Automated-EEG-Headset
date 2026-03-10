@@ -152,11 +152,17 @@ void loop() {
     }
 
     unsigned long loop_time = millis() - lastMillis;
-    // Serial.println(loop_time);
     if (loop_time > MPRLS_SAMPLING_INTERVAL_MS) {
+      #ifdef DEBUG_SERIAL
+      Serial.println();
       Serial.print("Warning: Loop time ");
       Serial.print(loop_time);
       Serial.println("ms exceeds sampling interval!");
+      #endif
+      WatchdogPacket pkt;
+      pkt.overrun = 1;
+      pkt.loop_time_ms = loop_time;
+      bridge.send(pkt);
     }
   }
 }

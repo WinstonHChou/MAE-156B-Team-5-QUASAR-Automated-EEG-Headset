@@ -22,10 +22,14 @@
  * @var SENSOR
  *      Sensor data packet (value = 1). Sent from microcontroller to host
  *      containing pressure and force measurements.
+ * @var WATCHDOG
+ *      Watchdog/status packet (value = 2). Sent from microcontroller to host
+ *      containing system status information such as loop timing and overrun.
  */
 enum PacketID : uint8_t {
     CONTROL = 0x00,
     SENSOR  = 0x01,
+    WATCHDOG = 0x02,
 };
 
 
@@ -111,3 +115,8 @@ typedef struct __attribute__((packed)) {
     float sensor_pressure_rate_kPa_s;
     float sensor_force_g;
 } SensorPacket;
+
+typedef struct __attribute__((packed)) {
+    uint8_t overrun;
+    uint32_t loop_time_ms;
+} WatchdogPacket;
