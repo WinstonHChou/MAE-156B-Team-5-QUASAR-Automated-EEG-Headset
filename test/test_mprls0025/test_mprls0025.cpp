@@ -51,6 +51,9 @@ void test_mprls0025_pressure(void) {
 }
 
 static void run_all_tests(void) {
+  for (const auto& mux : TCAADDR_ADDRESSES) {
+    tcadisable(mux);  // Ensure mux is disabled before scanning
+  }
   UNITY_BEGIN();
   RUN_TEST(test_mprls0025_pressure);
   UNITY_END();

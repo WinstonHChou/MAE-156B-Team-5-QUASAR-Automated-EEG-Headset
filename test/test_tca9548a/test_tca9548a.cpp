@@ -76,6 +76,9 @@ static void run_all_tests(void) {
   RUN_TEST(test_tcadisable);
   RUN_TEST(test_tcaselect_invalid_port);
   UNITY_END();
+  for (const auto& mux : TCAADDR_ADDRESSES) {
+    tcadisable(mux);  // Ensure mux is disabled before scanning
+  }
 }
 
 void setup() {
