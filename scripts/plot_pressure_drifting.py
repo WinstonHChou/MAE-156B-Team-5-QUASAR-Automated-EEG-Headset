@@ -6,6 +6,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
+ENABLE_SIM = False  # Set to True to enable air diffusion model simulation
+
 def air_diffusion_model(dt, P_k, P_amb, k):
     """
     Simple exponential decay model for pressure drifting due to air diffusion.
@@ -41,7 +43,8 @@ def main():
     line_sim = None
     if second_csv_path:
         (line2,) = ax.plot([], [], linewidth=2, color="tab:orange", label="Ambient Pressure (kPa)")
-        (line_sim,) = ax.plot([], [], linewidth=2, color="tab:green", linestyle="--", label="Air Diffusion Model (kPa)")
+        if ENABLE_SIM:
+            (line_sim,) = ax.plot([], [], linewidth=2, color="tab:green", linestyle="--", label="Air Diffusion Model (kPa)")
 
     fig.suptitle(f"Pressure vs Time:\n{prefix}\n{csv_path.stem}" if prefix else f"Pressure vs Time:\n{csv_path.stem}")
 
@@ -102,7 +105,7 @@ def main():
     line.set_data(xdata, ydata)
     if line2 is not None:
         line2.set_data(xdata, y2data)
-    if line_sim is not None:
+    if line_sim is not None and ENABLE_SIM:
         line_sim.set_data(xdata, ydata_sim)
     ax.relim()
     ax.autoscale_view()
