@@ -106,7 +106,7 @@ void loop() {
       if (sensor) {
         sensor->requestMeasurement();
         if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(sensor->getMuxAddress());
+          tcadisable(prev_mux_addr);
           prev_mux_addr = sensor->getMuxAddress();
         }
       }
@@ -148,7 +148,7 @@ void loop() {
         bridge.send(pkt);
 
         if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(sensor->getMuxAddress());
+          tcadisable(prev_mux_addr);
           prev_mux_addr = sensor->getMuxAddress();
         }
       }
