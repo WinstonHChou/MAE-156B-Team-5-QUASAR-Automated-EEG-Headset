@@ -15,7 +15,7 @@
 
 #define I2C_CLOCK_FREQ I2C_FAST_MODE_CLOCK_FREQ
 #define BRIDGE_BAUDRATE 115200
-#define WAIT_FOR_CONVERSION_TIME_MS 5   // Longest conversion time (typically 5ms)
+#define WAIT_FOR_CONVERSION_TIME_MS 5   // Longest sensor conversion time (typically 5ms)
 
 // 3. The Addressing Logic
 constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
