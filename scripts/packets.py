@@ -4,8 +4,9 @@ from abc import ABC, abstractmethod
 from pySerialTransfer.pySerialTransfer import SerialTransfer, Status, STRUCT_FORMAT_LENGTHS
 
 class PacketID(IntFlag):
-    PACKET_CONTROL = 0x00
-    PACKET_SENSOR  = 0x01
+    CONTROL = 0x00
+    SENSOR  = 0x01
+    WATCHDOG = 0x02
 
 class ControlFlags(IntFlag):
     CTRL_ACK  = 1 << 0  # 1 = ACK, 0 = NACK
@@ -14,7 +15,13 @@ class ControlFlags(IntFlag):
 
 class RequestType(IntFlag):
     REQUEST_RESET_ZERO_LOAD = 0x00
-    REQUEST_CALIBRATION     = 0x01
+    REQUEST_CALIBRATION_START = 0x01
+    REQUEST_CALIBRATION_END = 0x02
+
+class ErrorCode(IntFlag):
+    ERR_NONE = 0x00
+    ERR_INVALID_REQUEST = 0x01
+    ERR_SENSOR_FAILURE = 0x02
 
 class Packet(ABC):
     @abstractmethod
@@ -32,27 +39,31 @@ class ControlPacket(Packet):
     def __init__(self):
         super().__init__()
         self.sensor_idx = 0
-        self.request_idx = RequestType.REQUEST_CALIBRATION
+        self.request_idx = RequestType.REQUEST_RESET_ZERO_LOAD
         self.flags = 0
-        self.error_code = 0
+        self.error_code = ErrorCode.ERR_NONE
+        self.payload = 0
 
     def serialize(self, link):
         sendSize = 0
-        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='b')
-        sendSize = link.tx_obj(self.request_idx, start_pos=sendSize, val_type_override='b')
-        sendSize = link.tx_obj(self.flags, start_pos=sendSize, val_type_override='b')
-        sendSize = link.tx_obj(self.error_code, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='B')
+        sendSize = link.tx_obj(self.request_idx, start_pos=sendSize, val_type_override='B')
+        sendSize = link.tx_obj(self.flags, start_pos=sendSize, val_type_override='B')
+        sendSize = link.tx_obj(self.error_code, start_pos=sendSize, val_type_override='B')
+        sendSize = link.tx_obj(self.payload, start_pos=sendSize, val_type_override='l')
         return sendSize
     
     def deserialize(self, link):
         recSize = 0
-        self.sensor_idx = link.rx_obj(obj_type='b', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['b']
-        self.request_idx = link.rx_obj(obj_type='b', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['b']
-        self.flags = link.rx_obj(obj_type='b', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['b']
-        self.error_code = link.rx_obj(obj_type='b', start_pos=recSize)
+        self.sensor_idx = link.rx_obj(obj_type='B', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['B']
+        self.request_idx = link.rx_obj(obj_type='B', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['B']
+        self.flags = link.rx_obj(obj_type='B', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['B']
+        self.error_code = link.rx_obj(obj_type='B', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['B']
+        self.payload = link.rx_obj(obj_type='l', start_pos=recSize)
 
 class SensorPacket(Packet):
     def __init__(self):
@@ -64,7 +75,7 @@ class SensorPacket(Packet):
 
     def serialize(self, link):
         sendSize = 0
-        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='b')
+        sendSize = link.tx_obj(self.sensor_idx, start_pos=sendSize, val_type_override='B')
         sendSize = link.tx_obj(self.sensor_pressure_kPa, start_pos=sendSize, val_type_override='f')
         sendSize = link.tx_obj(self.sensor_pressure_rate_kPa_s, start_pos=sendSize, val_type_override='f')
         sendSize = link.tx_obj(self.sensor_force_g, start_pos=sendSize, val_type_override='f')
@@ -72,13 +83,32 @@ class SensorPacket(Packet):
 
     def deserialize(self, link):
         recSize = 0
-        self.sensor_idx = link.rx_obj(obj_type='b', start_pos=recSize)
-        recSize += STRUCT_FORMAT_LENGTHS['b']
+        self.sensor_idx = link.rx_obj(obj_type='B', start_pos=recSize)
+        recSize += STRUCT_FORMAT_LENGTHS['B']
         self.sensor_pressure_kPa = link.rx_obj(obj_type='f', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['f']
         self.sensor_pressure_rate_kPa_s = link.rx_obj(obj_type='f', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['f']
         self.sensor_force_g = link.rx_obj(obj_type='f', start_pos=recSize)
+
+class WatchdogPacket(Packet):
+    def __init__(self):
+        super().__init__()
+        self.overrun = bool(0)
+        self.loop_time_ms = int(0)
+
+    def serialize(self, link):
+        sendSize = 0
+        sendSize = link.tx_obj(self.overrun, start_pos=sendSize, val_type_override='B')
+        sendSize = link.tx_obj(self.loop_time_ms, start_pos=sendSize, val_type_override='L')
+        return sendSize
+
+    def deserialize(self, link):
+        recSize = 0
+        self.overrun = bool(link.rx_obj(obj_type='B', start_pos=recSize))
+        recSize += STRUCT_FORMAT_LENGTHS['B']
+        self.loop_time_ms = link.rx_obj(obj_type='L', start_pos=recSize)
+
 
 class SerialBridge:
     def __init__(self, port, baud, debug=False):
@@ -102,9 +132,11 @@ class SerialBridge:
         '''
 
         if type(pkt) == ControlPacket:
-            packet_id = PacketID.PACKET_CONTROL
+            packet_id = PacketID.CONTROL
         elif type(pkt) == SensorPacket:
-            packet_id = PacketID.PACKET_SENSOR
+            packet_id = PacketID.SENSOR
+        elif type(pkt) == WatchdogPacket:
+            packet_id = PacketID.WATCHDOG
         else:
             packet_id = 0   # Default to 0
         # Serialize and send packet
@@ -131,15 +163,21 @@ class SerialBridge:
                 else:
                     print(f'ERROR: {self.link.status.name}')
 
-            if self.link.id_byte == PacketID.PACKET_SENSOR:
+            if self.link.id_byte == PacketID.SENSOR:
                 pkt = SensorPacket()
                 pkt.deserialize(self.link)
                 if self.debug:
                     print(f"Received Sensor Packet: {pkt.to_str()}")
                 return pkt
-            elif self.link.id_byte == PacketID.PACKET_CONTROL:
+            elif self.link.id_byte == PacketID.CONTROL:
                 pkt = ControlPacket()
                 pkt.deserialize(self.link)
+                print(f"Received Control Packet - Sensor Index: {pkt.sensor_idx}, Request Type: {RequestType(pkt.request_idx).name}, Flags: {ControlFlags(pkt.flags)}, Error Code: {ErrorCode(pkt.error_code)}, Payload: {pkt.payload}")
                 if pkt.flags & ControlFlags.CTRL_ACK:
                     print(f"Received Control ACK for Sensor {pkt.sensor_idx} with request {RequestType(pkt.request_idx).name}")
+                return pkt
+            elif self.link.id_byte == PacketID.WATCHDOG:
+                pkt = WatchdogPacket()
+                pkt.deserialize(self.link)
+                print(f"Received Watchdog Packet: {pkt.to_str()}")
                 return pkt

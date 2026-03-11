@@ -34,7 +34,7 @@ def controlRequestThread(bridge: SerialBridge):
     Thread function to periodically send control packets to the Arduino. This can be used
     to request sensor data or send commands at regular intervals.
     '''
-    options = [RequestType.REQUEST_RESET_ZERO_LOAD.name, RequestType.REQUEST_CALIBRATION.name]
+    options = list(RequestType.__members__.keys())
     min_val = 0
     max_val = 31
 
@@ -55,9 +55,13 @@ def controlRequestThread(bridge: SerialBridge):
                 # Handle the error if the input cannot be converted to an integer
                 print("Invalid input. Please enter a whole number.")
 
+        raw_byte_array = bytes([number, RequestType[request_mask].value, 0, 0])  # sensor_idx, request_idx, flags, error_code
         pkt = ControlPacket()
-        pkt.sensor_idx = number
-        pkt.request_idx = RequestType[request_mask].value
+        pkt.sensor_idx = raw_byte_array[0]
+        pkt.request_idx = pkt.flags = raw_byte_array[1]
+        pkt.flags = raw_byte_array[2]
+        pkt.error_code = raw_byte_array[3]
+        pkt.payload = 0
         bridge.send(pkt)
 
         print(f"Sending Control Packet - Sensor Index: {pkt.sensor_idx}, Request Type: {RequestType(pkt.request_idx).name}")

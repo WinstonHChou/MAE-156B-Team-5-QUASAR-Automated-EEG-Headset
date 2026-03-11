@@ -22,10 +22,14 @@
  * @var SENSOR
  *      Sensor data packet (value = 1). Sent from microcontroller to host
  *      containing pressure and force measurements.
+ * @var WATCHDOG
+ *      Watchdog/status packet (value = 2). Sent from microcontroller to host
+ *      containing system status information such as loop timing and overrun.
  */
 enum PacketID : uint8_t {
     CONTROL = 0x00,
     SENSOR  = 0x01,
+    WATCHDOG = 0x02,
 };
 
 
@@ -54,8 +58,16 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_RESET_ZERO_LOAD = 0x00,
-    REQUEST_CALIBRATION     = 0x01,
+    REQUEST_RESET_ZERO_LOAD     = 0x00,
+    REQUEST_CALIBRATION_START   = 0x01,
+    REQUEST_CALIBRATION_END     = 0x02,
+};
+
+enum ErrorCode : uint8_t {
+    ERR_NONE                    = 0x00,
+    ERR_INVALID_REQUEST         = 0x01,
+    ERR_SENSOR_FAILURE          = 0x02,
+    // Add more error codes as needed
 };
 
 /**
@@ -79,6 +91,7 @@ typedef struct __attribute__((packed)) {
     RequestType request_idx;    // request type
     uint8_t flags;              // bitmask: ACK/BUSY/ERR
     uint8_t error_code;         // optional: 0 = none
+    uint32_t payload;
 } ControlPacket;
 
 
@@ -103,3 +116,18 @@ typedef struct __attribute__((packed)) {
     float sensor_pressure_rate_kPa_s;
     float sensor_force_g;
 } SensorPacket;
+
+/** @struct WatchdogPacket
+ * @brief Watchdog/status packet sent from microcontroller to host
+ * 
+ * Contains system status information such as loop timing and overrun.
+ * 
+ * @var overrun
+ *      Flag indicating if an overrun occurred (1 = overrun, 0 = no overrun)
+ * @var loop_time_ms
+ *      Time taken for the main loop in milliseconds
+ */
+typedef struct __attribute__((packed)) {
+    uint8_t overrun;
+    uint32_t loop_time_ms;
+} WatchdogPacket;

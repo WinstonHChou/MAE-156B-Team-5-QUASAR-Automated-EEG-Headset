@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+// #define DEBUG_SERIAL
+
 // 1. Hardware Pins
 #define RESET_PIN   -1 
 #define EOC_PIN     -1 
