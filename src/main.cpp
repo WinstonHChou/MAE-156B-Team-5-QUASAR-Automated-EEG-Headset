@@ -60,7 +60,7 @@ unsigned long lastMillis = 0;
 uint8_t prev_mux_addr = TCAADDR_ADDRESSES[0];
 void loop() {
   // Check for bridge requests from host, which are sent as ControlPackets.
-  ControlPacket pkt;
+  ControlPacket pkt = {};
   if (bridge.receive(pkt) && pkt.sensor_idx < NUM_OF_SENSOR_SLOTS && load_cells[pkt.sensor_idx]) {
 
     switch (pkt.request_idx) {
@@ -104,11 +104,11 @@ void loop() {
     // STEP 1: Broadcast "Start" to all sensors
     for (auto& sensor : load_cells) {
       if (sensor) {
-        sensor->requestMeasurement();
         if (sensor->getMuxAddress() != prev_mux_addr) {
           tcadisable(prev_mux_addr);
           prev_mux_addr = sensor->getMuxAddress();
         }
+        sensor->requestMeasurement();
       }
     }
 
@@ -119,6 +119,10 @@ void loop() {
     // STEP 3: Collect data and send via SerialTransfer
     for (auto& sensor : load_cells) {
       if (sensor) {
+        if (sensor->getMuxAddress() != prev_mux_addr) {
+          tcadisable(prev_mux_addr);
+          prev_mux_addr = sensor->getMuxAddress();
+        }
         // periodic update of sensor readings;
         sensor->update();
 
@@ -139,18 +143,13 @@ void loop() {
         #endif
 
         // Send via SerialBridge
-        SensorPacket pkt;
+        SensorPacket pkt = {};
         pkt.sensor_idx = sensor->getSensorIndex();
         pkt.sensor_pressure_kPa = pressure_kPa;
         pkt.sensor_pressure_rate_kPa_s = pressure_rate;
         pkt.sensor_force_g = F_g;
 
         bridge.send(pkt);
-
-        if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(prev_mux_addr);
-          prev_mux_addr = sensor->getMuxAddress();
-        }
       }
     }
 
@@ -162,7 +161,7 @@ void loop() {
       Serial.print(loop_time);
       Serial.println("ms exceeds sampling interval!");
       #endif
-      WatchdogPacket pkt;
+      WatchdogPacket pkt = {};
       pkt.overrun = 1;
       pkt.loop_time_ms = loop_time;
       bridge.send(pkt);
