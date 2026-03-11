@@ -76,9 +76,8 @@ void loop() {
         load_cells[pkt.sensor_idx]->setToCalibrationMode();
         break;
       case REQUEST_CALIBRATION_END:
-        float ratio = static_cast<float>(pkt.payload);
-        load_cells[pkt.sensor_idx]->setRatio(ratio); // End calibration mode to save the new ratio
-        load_cells[pkt.sensor_idx]->resetZeroLoad(); // After calibration, reset zero load to update the reference
+        load_cells[pkt.sensor_idx]->setRatio(static_cast<float>(pkt.payload));  // End calibration mode to save the new ratio
+        load_cells[pkt.sensor_idx]->resetZeroLoad();                            // After calibration, reset zero load to update the reference
         load_cells[pkt.sensor_idx]->setToNormalMode();
         break;
       case REQUEST_HARDWARE_RESET:
@@ -115,13 +114,13 @@ void loop() {
 
     // STEP 1: Broadcast "Start" to all sensors
     for (auto& sensor : load_cells) {
-      if (sensor) {
-        if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(prev_mux_addr);
-          prev_mux_addr = sensor->getMuxAddress();
-        }
-        sensor->requestMeasurement();
+      if (!sensor) continue; // Skip if sensor is not initialized
+
+      if (sensor->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = sensor->getMuxAddress();
       }
+      sensor->requestMeasurement();
     }
 
     // STEP 2: Wait once for the longest conversion time (typically 5ms)
@@ -144,43 +143,42 @@ void loop() {
 
     // STEP 4: Collect data and send via SerialTransfer
     for (auto& sensor : load_cells) {
+      if (!sensor) continue; // Skip if sensor is not initialized
+  
       // Skip sending data for ambient pressure sensor, it's only used for drift compensation
-      if (sensor->getSensorIndex() == AMBIENT_PRESSURE_SENSOR_IDX) continue; 
+      if (sensor->getSensorIndex() == AMBIENT_PRESSURE_SENSOR_IDX) continue;
 
-      // Check if sensor is available before reading data and sending packets
-      if (sensor) {
-        if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(prev_mux_addr);
-          prev_mux_addr = sensor->getMuxAddress();
-        }
-        // periodic update of sensor readings;
-        sensor->update();
-
-        // Read data
-        float pressure_kPa = sensor->getPressure();
-        float F_g = sensor->getForceFromPressure();
-        float pressure_rate = sensor->getPressureRate();
-
-        // Debug Serial Logging
-        #ifdef DEBUG_SERIAL
-        Serial.println();
-        Serial.print(">");
-        Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
-        Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
-        Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
-        Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
-        Serial.println();
-        #endif
-
-        // Send via SerialBridge
-        SensorPacket pkt = {};
-        pkt.sensor_idx = sensor->getSensorIndex();
-        pkt.sensor_pressure_kPa = pressure_kPa;
-        pkt.sensor_pressure_rate_kPa_s = pressure_rate;
-        pkt.sensor_force_g = F_g;
-
-        bridge.send(pkt);
+      if (sensor->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = sensor->getMuxAddress();
       }
+      // periodic update of sensor readings;
+      sensor->update();
+
+      // Read data
+      float pressure_kPa = sensor->getPressure();
+      float F_g = sensor->getForceFromPressure();
+      float pressure_rate = sensor->getPressureRate();
+
+      // Debug Serial Logging
+      #ifdef DEBUG_SERIAL
+      Serial.println();
+      Serial.print(">");
+      Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
+      Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
+      Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
+      Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
+      Serial.println();
+      #endif
+
+      // Send via SerialBridge
+      SensorPacket pkt = {};
+      pkt.sensor_idx = sensor->getSensorIndex();
+      pkt.sensor_pressure_kPa = pressure_kPa;
+      pkt.sensor_pressure_rate_kPa_s = pressure_rate;
+      pkt.sensor_force_g = F_g;
+
+      bridge.send(pkt);
     }
 
     unsigned long loop_time = millis() - lastMillis;

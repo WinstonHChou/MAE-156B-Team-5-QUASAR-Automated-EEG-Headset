@@ -196,7 +196,7 @@ class PneumaticLoadCell {
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
     float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
-    static float ambient_kPa_ = DEFAULT_AMBIENT_PRESSURE_KPA; // Ambient pressure for reference (kPa)
+    inline static float ambient_kPa_ = DEFAULT_AMBIENT_PRESSURE_KPA; // Ambient pressure for reference (kPa)
     float accumulated_drift_kPa_ = 0.0; // Accumulated drift in pressure (kPa) for compensation
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
     unsigned long current_timestamp_ms_ = 0; // Timestamp of the current reading for rate calculation
