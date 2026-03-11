@@ -124,9 +124,9 @@ void loop() {
       }
     }
 
-    // STEP 2: Wait once for the longest conversion time (typ 5ms)
+    // STEP 2: Wait once for the longest conversion time (typically 5ms)
     // During this time, every sensor is busy-calculating pressure.
-    delay(5);
+    delay(WAIT_FOR_CONVERSION_TIME_MS);
 
     // STEP 3: Read ambient pressure from the designated sensor for drift compensation
     if (AMBIENT_PRESSURE_SENSOR_IDX < NUM_OF_SENSOR_SLOTS && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]) {
