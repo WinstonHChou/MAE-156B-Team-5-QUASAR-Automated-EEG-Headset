@@ -63,20 +63,6 @@ void loop() {
   ControlPacket pkt;
   if (bridge.receive(pkt) && pkt.sensor_idx < NUM_OF_SENSOR_SLOTS && load_cells[pkt.sensor_idx]) {
 
-    pkt.flags |= CTRL_ACK; // Acknowledge receipt of the control packet
-    switch (load_cells[pkt.sensor_idx]->getStatus()) {
-      case PneumaticLoadCell::OK:
-        pkt.flags |= 0; // no additional flags
-        break;
-      case PneumaticLoadCell::BUSY:
-        pkt.flags |= CTRL_BUSY;
-        break;
-      case PneumaticLoadCell::FAILURE:
-        pkt.flags |= CTRL_ERR;
-        pkt.error_code = ERR_SENSOR_FAILURE;
-        break;
-    }
-
     switch (pkt.request_idx) {
       case REQUEST_RESET_ZERO_LOAD:
         if (load_cells[pkt.sensor_idx]->getStatus() == PneumaticLoadCell::OK) {
@@ -91,6 +77,20 @@ void loop() {
         break;
       case REQUEST_CALIBRATION_END:
         load_cells[pkt.sensor_idx]->setToNormalMode();
+        break;
+    }
+
+    pkt.flags |= CTRL_ACK; // Acknowledge receipt of the control packet
+    switch (load_cells[pkt.sensor_idx]->getStatus()) {
+      case PneumaticLoadCell::OK:
+        pkt.flags |= 0; // no additional flags
+        break;
+      case PneumaticLoadCell::BUSY:
+        pkt.flags |= CTRL_BUSY;
+        break;
+      case PneumaticLoadCell::FAILURE:
+        pkt.flags |= CTRL_ERR;
+        pkt.error_code = ERR_SENSOR_FAILURE;
         break;
     }
 
