@@ -14,14 +14,15 @@ class ControlFlags(IntFlag):
     CTRL_ERR  = 1 << 2  # error present
 
 class RequestType(IntFlag):
-    REQUEST_TARING = 0x00
-    REQUEST_CALIBRATION_START = 0x01
-    REQUEST_CALIBRATION_END = 0x02
+    REQUEST_TARING              = 0x00
+    REQUEST_CALIBRATION_START   = 0x01
+    REQUEST_CALIBRATION_END     = 0x02
+    REQUEST_HARDWARE_RESET      = 0x03
 
 class ErrorCode(IntFlag):
-    ERR_NONE = 0x00
-    ERR_INVALID_REQUEST = 0x01
-    ERR_SENSOR_FAILURE = 0x02
+    ERR_NONE                    = 0x00
+    ERR_INVALID_REQUEST         = 0x01
+    ERR_SENSOR_FAILURE          = 0x02
 
 class Packet(ABC):
     @abstractmethod

@@ -78,6 +78,13 @@ void loop() {
       case REQUEST_CALIBRATION_END:
         load_cells[pkt.sensor_idx]->setToNormalMode();
         break;
+      case REQUEST_HARDWARE_RESET:
+        load_cells[pkt.sensor_idx]->resetHardware();
+      break;
+      default:
+        pkt.flags |= CTRL_ERR; // Invalid request type
+        pkt.error_code = ERR_INVALID_REQUEST;
+        break;
     }
 
     pkt.flags |= CTRL_ACK; // Acknowledge receipt of the control packet
@@ -91,6 +98,8 @@ void loop() {
       case PneumaticLoadCell::FAILURE:
         pkt.flags |= CTRL_ERR;
         pkt.error_code = ERR_SENSOR_FAILURE;
+        break;
+      default:
         break;
     }
 

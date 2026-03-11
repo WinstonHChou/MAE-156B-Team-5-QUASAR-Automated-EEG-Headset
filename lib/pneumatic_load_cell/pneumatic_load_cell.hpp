@@ -13,26 +13,13 @@
 #define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 #define PSI_to_KPA (6.8947572932f)   ///< Constant: PSI to KPA conversion factor
 
-#define LED_ON          LOW   // for active-low wiring
-#define LED_OFF         HIGH
-#define LED_STATUS_PIN  1  // Status LED on sensor breakout board (P1)
+#define GPIO_HARDWARE_RESET_PIN       0         // GPIO pin for hardware reset control (if needed)
 
-double interp_clamp(const std::map<double,double>& m, double x) {
-  if (m.empty()) return std::numeric_limits<double>::quiet_NaN();
+#define LED_ON                        LOW       // for active-low wiring
+#define LED_OFF                       HIGH
+#define LED_STATUS_PIN                1         // Status LED on sensor breakout board (P1)
+#define LED_HARDWARE_RESET_STATUS_PIN 2         // Hardware reset indicator LED on breakout board (P2)
 
-  auto hi = m.lower_bound(x);                 // first key >= x
-
-  if (hi == m.begin()) return hi->second;     // x <= first key (clamp)
-  if (hi == m.end())   return std::prev(hi)->second; // x > last key (clamp)
-
-  auto lo = std::prev(hi);                    // key < x
-
-  const double x0 = lo->first, y0 = lo->second;
-  const double x1 = hi->first, y1 = hi->second;
-
-  const double t = (x - x0) / (x1 - x0);
-  return y0 + t * (y1 - y0);
-}
 
 // Pneumatic Load Cell
 class PneumaticLoadCell {
@@ -83,17 +70,9 @@ class PneumaticLoadCell {
       return true;
     }
 
-    // End communication with the sensor (if needed)
-    void end() {
-      tcadisable(mux_);
-      if (status_led_) {
-        delete status_led_;
-        status_led_ = nullptr;
-      }
-    }
-
     void requestMeasurement() {
       tcaselect(ch_, mux_);
+      if (hardware_reset_triggered_) return; // If hardware reset is active, skip requesting measurement
       sensor_.requestData();
     }
 
@@ -121,6 +100,17 @@ class PneumaticLoadCell {
         if (desired_led_state != last_led_state_) {
           status_led_->digitalWrite(LED_STATUS_PIN, desired_led_state);
           last_led_state_ = desired_led_state;
+        }
+
+        if (hardware_reset_triggered_) {
+          if (millis() - last_reset_time_ms_ > HARDWARE_RESET_TIMEOUT_MS) {
+            // If hardware reset is active, override to indicate reset status
+            status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, HIGH); // Assert reset
+            status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_OFF); // Indicate hardware reset is ended
+            hardware_reset_triggered_ = false; // Reset state back to inactive after asserting
+            status_ = OK; // Assume sensor will be OK after reset
+          }
+          return; // Skip the rest of the update while in hardware reset
         }
       }
 
@@ -173,6 +163,16 @@ class PneumaticLoadCell {
       status_ = OK;
     }
 
+    void resetHardware() {
+      if (status_led_ && status_led_->digitalRead(GPIO_HARDWARE_RESET_PIN) == HIGH) {
+        status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, LOW); // Assert reset
+        status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_ON); // Indicate hardware reset in progress
+        hardware_reset_triggered_ = true;
+        status_ = FAILURE; // Set status to FAILURE during reset
+        last_reset_time_ms_ = millis();
+      }
+    }
+
   private:
     uint8_t buffer_[4]; // buffer to hold raw data from sensor
     mprls0025pa00001a sensor_ = mprls0025pa00001a();
@@ -184,13 +184,14 @@ class PneumaticLoadCell {
     pca9570* status_led_ = nullptr; // Pointer to status LED object
     SensorStatus status_ = OK; // Current status of the sensor
     uint8_t last_led_state_ = LED_OFF; // Track last LED state to avoid redundant writes
-    // std::map<double, double> calibration_map_; // Map of <pressure (kPa), force (grams)>
+    boolean hardware_reset_triggered_ = false;
+    unsigned long last_reset_time_ms_ = 0; // Timestamp of the last reset for timeout handling
 
     float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
     float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
-    unsigned long current_timestamp_ms_ = 0.0; // Timestamp of the current reading for rate calculation
-    unsigned long last_timestamp_ms_ = 0.0;  // Timestamp of the last reading for rate calculation
+    unsigned long current_timestamp_ms_ = 0; // Timestamp of the current reading for rate calculation
+    unsigned long last_timestamp_ms_ = 0;  // Timestamp of the last reading for rate calculation
 };

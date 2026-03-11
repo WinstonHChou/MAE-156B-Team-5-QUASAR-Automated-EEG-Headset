@@ -61,6 +61,8 @@ enum RequestType : uint8_t {
     REQUEST_TARING     = 0x00,
     REQUEST_CALIBRATION_START   = 0x01,
     REQUEST_CALIBRATION_END     = 0x02,
+    REQUEST_HARDWARE_RESET      = 0x03,
+    // add more request types as needed
 };
 
 enum ErrorCode : uint8_t {

@@ -26,6 +26,7 @@ constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
 #define MPRLS_SAMPLING_INTERVAL_MS   10
 #define MPRLS_SAMPLING_RATE_HZ       (1000.0f / MPRLS_SAMPLING_INTERVAL_MS)
 #define READING_TIMEOUT              10
+#define HARDWARE_RESET_TIMEOUT_MS    50 // Timeout for hardware reset in milliseconds
 
 // 5. Physics & Calibration
 #define LOWPASS_ORDER                2
