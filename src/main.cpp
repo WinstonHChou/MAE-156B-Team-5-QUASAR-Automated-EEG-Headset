@@ -64,7 +64,7 @@ void loop() {
   if (bridge.receive(pkt) && pkt.sensor_idx < NUM_OF_SENSOR_SLOTS && load_cells[pkt.sensor_idx]) {
 
     switch (pkt.request_idx) {
-      case REQUEST_RESET_ZERO_LOAD:
+      case REQUEST_TARING:
         if (load_cells[pkt.sensor_idx]->getStatus() == PneumaticLoadCell::OK) {
           load_cells[pkt.sensor_idx]->resetZeroLoad();
         } else {

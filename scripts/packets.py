@@ -14,7 +14,7 @@ class ControlFlags(IntFlag):
     CTRL_ERR  = 1 << 2  # error present
 
 class RequestType(IntFlag):
-    REQUEST_RESET_ZERO_LOAD = 0x00
+    REQUEST_TARING = 0x00
     REQUEST_CALIBRATION_START = 0x01
     REQUEST_CALIBRATION_END = 0x02
 
@@ -39,7 +39,7 @@ class ControlPacket(Packet):
     def __init__(self):
         super().__init__()
         self.sensor_idx = 0
-        self.request_idx = RequestType.REQUEST_RESET_ZERO_LOAD
+        self.request_idx = RequestType.REQUEST_TARING
         self.flags = 0
         self.error_code = ErrorCode.ERR_NONE
         self.payload = 0

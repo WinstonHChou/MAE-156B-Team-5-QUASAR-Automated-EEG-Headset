@@ -58,7 +58,7 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_RESET_ZERO_LOAD     = 0x00,
+    REQUEST_TARING     = 0x00,
     REQUEST_CALIBRATION_START   = 0x01,
     REQUEST_CALIBRATION_END     = 0x02,
 };
