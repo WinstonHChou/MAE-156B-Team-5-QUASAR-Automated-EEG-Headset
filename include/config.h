@@ -32,4 +32,7 @@ constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
 #define LOWPASS_ORDER                2
 #define LOWPASS_CUTOFF_FREQ_HZ       3.0f
 #define FORCE_TO_SENSOR_RATIO        56.436f
+#define DRIFT_TIME_CONSTANT_S        8000.0f
 #define MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S 0.1f
+#define AMBIENT_PRESSURE_SENSOR_IDX  31 // Index of the sensor used for ambient pressure reference
+#define DEFAULT_AMBIENT_PRESSURE_KPA (101.3f) ///< Default ambient pressure in kPa at sea level for drift compensation

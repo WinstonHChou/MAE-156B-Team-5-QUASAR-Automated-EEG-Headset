@@ -114,20 +114,16 @@ class PneumaticLoadCell {
         }
       }
 
-      // sensor_.readPressure() is a BLOCKING call (approx 5-8ms)
+      // Read raw pressure data from the sensor
       const uint32_t& raw_val = sensor_.readData(buffer_);
       current_kPa_ = lp_.filter(sensor_.convertToPressure(raw_val));
       current_timestamp_ms_ = millis();
 
-      // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
-      // otherwise calculate drifting compensated zero load pressure
-      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
-        // Update force reading only if pressure rate is above threshold to filter out drifts
-        current_force_g_ = (current_kPa_ - zero_kPa_) * ratio_;  // in grams
-      } else {
-        // Calculate drifting compensated zero load pressure
-        zero_kPa_ = current_kPa_ - (current_force_g_ / ratio_);
-      }
+      // Estimator pipeline: exponential decay model for drift compensation
+      accumulated_drift_kPa_ +=
+          (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (current_timestamp_ms_ - last_timestamp_ms_) / 1000.0f;
+      float estimated_pressure_kPa_ = current_kPa_ + accumulated_drift_kPa_;
+      current_force_g_ = (estimated_pressure_kPa_ - zero_kPa_) * ratio_;  // in grams
     }
 
     float getPressure() {
@@ -153,6 +149,7 @@ class PneumaticLoadCell {
       // readData needs a buffer; we can use the class member buffer_
       uint32_t raw = sensor_.readData(buffer_); 
       zero_kPa_ = sensor_.convertToPressure(raw);
+      accumulated_drift_kPa_ = 0.0f; // Reset accumulated drift when zero load is reset
     }
 
     void setToCalibrationMode() {
@@ -173,6 +170,10 @@ class PneumaticLoadCell {
       }
     }
 
+    static void updateAmbientPressure(float ambient_kPa) {
+      ambient_kPa_ = ambient_kPa;
+    }
+
   private:
     uint8_t buffer_[4]; // buffer to hold raw data from sensor
     mprls0025pa00001a sensor_ = mprls0025pa00001a();
@@ -191,6 +192,8 @@ class PneumaticLoadCell {
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
     float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
+    static float ambient_kPa_ = DEFAULT_AMBIENT_PRESSURE_KPA; // Ambient pressure for reference (kPa)
+    float accumulated_drift_kPa_ = 0.0; // Accumulated drift in pressure (kPa) for compensation
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
     unsigned long current_timestamp_ms_ = 0; // Timestamp of the current reading for rate calculation
     unsigned long last_timestamp_ms_ = 0;  // Timestamp of the last reading for rate calculation

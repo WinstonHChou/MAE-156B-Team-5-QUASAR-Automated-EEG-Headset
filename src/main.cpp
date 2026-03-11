@@ -125,8 +125,26 @@ void loop() {
     // During this time, every sensor is busy-calculating pressure.
     delay(5);
 
-    // STEP 3: Collect data and send via SerialTransfer
+    // STEP 3: Read ambient pressure from the designated sensor for drift compensation
+    if (AMBIENT_PRESSURE_SENSOR_IDX < NUM_OF_SENSOR_SLOTS && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]) {
+      if (load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress();
+      }
+      load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->update(); // Update to get the latest reading
+      float ambient_kPa = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getPressure();
+      PneumaticLoadCell::updateAmbientPressure(ambient_kPa); // Update ambient pressure for drift compensation
+    } else {
+      // If ambient pressure sensor is not available, use DEFAULT_AMBIENT_PRESSURE_KPA
+      PneumaticLoadCell::updateAmbientPressure(DEFAULT_AMBIENT_PRESSURE_KPA);
+    }
+
+    // STEP 4: Collect data and send via SerialTransfer
     for (auto& sensor : load_cells) {
+      // Skip sending data for ambient pressure sensor, it's only used for drift compensation
+      if (sensor->getSensorIndex() == AMBIENT_PRESSURE_SENSOR_IDX) continue; 
+
+      // Check if sensor is available before reading data and sending packets
       if (sensor) {
         if (sensor->getMuxAddress() != prev_mux_addr) {
           tcadisable(prev_mux_addr);
