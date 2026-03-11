@@ -136,6 +136,15 @@ void loop() {
       load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->update(); // Update to get the latest reading
       float ambient_kPa = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getPressure();
       PneumaticLoadCell::updateAmbientPressure(ambient_kPa); // Update ambient pressure for drift compensation
+
+      // Send via SerialBridge
+      SensorPacket amb_sensor_pkt = {};
+      amb_sensor_pkt.sensor_idx = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getSensorIndex();
+      amb_sensor_pkt.sensor_pressure_kPa = ambient_kPa;
+      amb_sensor_pkt.sensor_pressure_rate_kPa_s = 0.0f;
+      amb_sensor_pkt.sensor_force_g = 0.0f;
+
+      bridge.send(amb_sensor_pkt);
     } else {
       // If ambient pressure sensor is not available, use DEFAULT_AMBIENT_PRESSURE_KPA
       PneumaticLoadCell::updateAmbientPressure(DEFAULT_AMBIENT_PRESSURE_KPA);
