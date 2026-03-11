@@ -4,8 +4,6 @@
 // #define DEBUG_SERIAL
 
 // 1. Hardware Pins
-#define RESET_PIN   -1 
-#define EOC_PIN     -1 
 #define SDA_PIN     22  // not ESP32 default SDA pin (21), it's reversed on the breakout board, so we have to specify it here
 #define SCL_PIN     21  // not ESP32 default SCL pin (22), it's reversed on the breakout board, so we have to specify it here
 
