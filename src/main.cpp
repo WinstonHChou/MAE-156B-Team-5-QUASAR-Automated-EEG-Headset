@@ -65,22 +65,36 @@ void loop() {
 
     switch (pkt.request_idx) {
       case REQUEST_TARING:
-        if (load_cells[pkt.sensor_idx]->getStatus() == PneumaticLoadCell::OK) {
-          load_cells[pkt.sensor_idx]->resetZeroLoad();
-        } else {
+        if (load_cells[pkt.sensor_idx]->getStatus() != PneumaticLoadCell::OK) {
           pkt.flags |= CTRL_ERR; // Cannot perform zero load reset if sensor is not in OK status
           pkt.error_code = ERR_INVALID_REQUEST;
         }
+        load_cells[pkt.sensor_idx]->resetZeroLoad();
         break;
       case REQUEST_CALIBRATION_START:
         load_cells[pkt.sensor_idx]->setToCalibrationMode();
         break;
       case REQUEST_CALIBRATION_END:
-        load_cells[pkt.sensor_idx]->setRatio(static_cast<float>(pkt.payload));  // End calibration mode to save the new ratio
-        load_cells[pkt.sensor_idx]->resetZeroLoad();                            // After calibration, reset zero load to update the reference
+        if (load_cells[pkt.sensor_idx]->getStatus() != PneumaticLoadCell::BUSY) {
+          pkt.flags |= CTRL_ERR;  // Cannot accept calibration end request if sensor is not currently in BUSY (calibration) status
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
+        load_cells[pkt.sensor_idx]->setRatio(static_cast<float>(pkt.payload));            // End calibration mode to save the new ratio
+        load_cells[pkt.sensor_idx]->resetZeroLoad();                                      // After calibration, reset zero load to update the reference
         load_cells[pkt.sensor_idx]->setToNormalMode();
         break;
       case REQUEST_HARDWARE_RESET:
+        if (load_cells[pkt.sensor_idx]->isHardwareResetInProgress()) {
+          pkt.flags |= CTRL_ERR;  // Cannot accept hardware reset request if a hardware reset is already in progress
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
+        if (pkt.sensor_idx == AMBIENT_PRESSURE_SENSOR_IDX) {
+          pkt.flags |= CTRL_ERR;  // Reject hardware reset requests for the ambient pressure sensor, as it's critical for drift compensation and should not be reset by user commands
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
         load_cells[pkt.sensor_idx]->resetHardware();
       break;
       default:
@@ -115,6 +129,7 @@ void loop() {
     // STEP 1: Broadcast "Start" to all sensors
     for (auto& sensor : load_cells) {
       if (!sensor) continue; // Skip if sensor is not initialized
+      if (sensor->getStatus() == PneumaticLoadCell::FAILURE) continue; // Skip if sensor is in FAILURE status, likely due to hardware reset
 
       if (sensor->getMuxAddress() != prev_mux_addr) {
         tcadisable(prev_mux_addr);
@@ -134,6 +149,10 @@ void loop() {
         prev_mux_addr = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress();
       }
       load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->update(); // Update to get the latest reading
+
+      // Keep calling update() for FAILURE sensors so LED/reset state can progress,
+      // but do not stream stale measurement data.
+
       float ambient_kPa = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getPressure();
       PneumaticLoadCell::updateAmbientPressure(ambient_kPa); // Update ambient pressure for drift compensation
 
@@ -153,7 +172,7 @@ void loop() {
     // STEP 4: Collect data and send via SerialTransfer
     for (auto& sensor : load_cells) {
       if (!sensor) continue; // Skip if sensor is not initialized
-  
+
       // Skip sending data for ambient pressure sensor, it's only used for drift compensation
       if (sensor->getSensorIndex() == AMBIENT_PRESSURE_SENSOR_IDX) continue;
 
@@ -163,6 +182,10 @@ void loop() {
       }
       // periodic update of sensor readings;
       sensor->update();
+
+      // Keep calling update() for FAILURE sensors so LED/reset state can progress,
+      // but do not stream stale measurement data.
+      if (sensor->getStatus() == PneumaticLoadCell::FAILURE && !sensor->isHardwareResetInProgress()) continue;
 
       // Read data
       float pressure_kPa = sensor->getPressure();

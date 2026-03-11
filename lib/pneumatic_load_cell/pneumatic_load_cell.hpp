@@ -18,7 +18,9 @@
 #define LED_ON                        LOW       // for active-low wiring
 #define LED_OFF                       HIGH
 #define LED_STATUS_PIN                1         // Status LED on sensor breakout board (P1)
-#define LED_HARDWARE_RESET_STATUS_PIN 2         // Hardware reset indicator LED on breakout board (P2)
+#define LED_TARING_STATUS_PIN         2         // Taring status LED on sensor breakout board (P2)
+#define LED_HARDWARE_RESET_STATUS_PIN 3         // Hardware reset indicator LED on breakout board (P3)
+#define LED_BLINK_INTERVAL_MS         500       // Interval for blinking the LED in busy status
 
 
 // Pneumatic Load Cell
@@ -51,6 +53,10 @@ class PneumaticLoadCell {
       return status_;
     }
 
+    bool isHardwareResetInProgress() const {
+      return hardware_reset_triggered_;
+    }
+
     // Read pressure from the sensor
     boolean begin() {
       tcaselect(ch_, mux_);
@@ -71,8 +77,8 @@ class PneumaticLoadCell {
     }
 
     void requestMeasurement() {
-      tcaselect(ch_, mux_);
       if (hardware_reset_triggered_) return; // If hardware reset is active, skip requesting measurement
+      tcaselect(ch_, mux_);
       sensor_.requestData();
     }
 
@@ -91,7 +97,7 @@ class PneumaticLoadCell {
             break;
           case BUSY:
             // Blink the LED to indicate busy status
-            desired_led_state = (millis() / 500) % 2 == 0 ? LED_ON : LED_OFF;
+            desired_led_state = (millis() / LED_BLINK_INTERVAL_MS) % 2 == 0 ? LED_ON : LED_OFF;
             break;
           case FAILURE:
             desired_led_state = LED_OFF;
@@ -101,23 +107,55 @@ class PneumaticLoadCell {
           status_led_->digitalWrite(LED_STATUS_PIN, desired_led_state);
           last_led_state_ = desired_led_state;
         }
+      }
 
-        if (hardware_reset_triggered_) {
-          if (millis() - last_reset_time_ms_ > HARDWARE_RESET_TIMEOUT_MS) {
-            // If hardware reset is active, override to indicate reset status
-            status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, HIGH); // Assert reset
+      // If sensor is in terminal failure state, avoid repeated I2C reads that can stall the loop.
+      if (status_ == FAILURE && !hardware_reset_triggered_) {
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      // Always short-circuit while reset is in progress, even if the LED expander is unavailable.
+      if (hardware_reset_triggered_) {
+        if (millis() - last_reset_time_ms_ > HARDWARE_RESET_TIMEOUT_MS) {
+          if (status_led_) {
+            status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, HIGH); // De-assert reset
             status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_OFF); // Indicate hardware reset is ended
-            hardware_reset_triggered_ = false; // Reset state back to inactive after asserting
-            status_ = OK; // Assume sensor will be OK after reset
           }
-          return; // Skip the rest of the update while in hardware reset
+          hardware_reset_triggered_ = false;
+          status_ = OK;
         }
+        current_timestamp_ms_ = millis();
+        return; // Skip the rest of update while hardware reset is active
       }
 
       // Read raw pressure data from the sensor
-      const uint32_t& raw_val = sensor_.readData(buffer_);
-      current_kPa_ = lp_.filter(sensor_.convertToPressure(raw_val));
+      const uint32_t raw_val = sensor_.readData(buffer_);
+      if (raw_val == 0xFFFFFFFF) {
+        status_ = FAILURE;
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      const float pressure_kPa = sensor_.convertToPressure(raw_val);
+      if (isnan(pressure_kPa)) {
+        status_ = FAILURE;
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      current_kPa_ = lp_.filter(pressure_kPa);
       current_timestamp_ms_ = millis();
+
+      if (taring_triggered_ && millis() - last_taring_time_ms_ > TARING_TIMEOUT_MS) {
+        if (status_led_) {
+          status_led_->digitalWrite(LED_TARING_STATUS_PIN, LED_OFF); // Indicate taring is completed
+        }
+        taring_triggered_ = false;
+        zero_kPa_ = current_kPa_;
+        prev_kPa_ = current_kPa_;      // Reset previous reading to avoid large spikes
+        accumulated_drift_kPa_ = 0.0f; // Reset accumulated drift when zero load is reset
+      }
 
       // Estimator pipeline: exponential decay model for drift compensation
       accumulated_drift_kPa_ +=
@@ -144,12 +182,11 @@ class PneumaticLoadCell {
 
     // Calibration procedure
     void resetZeroLoad() {
-      requestMeasurement();
-      delay(5); // Wait for the sensor to finish
-      // readData needs a buffer; we can use the class member buffer_
-      uint32_t raw = sensor_.readData(buffer_); 
-      zero_kPa_ = sensor_.convertToPressure(raw);
-      accumulated_drift_kPa_ = 0.0f; // Reset accumulated drift when zero load is reset
+      if (status_led_) {
+        status_led_->digitalWrite(LED_TARING_STATUS_PIN, LED_ON); // Indicate taring in progress
+      }
+      taring_triggered_ = true;
+      last_taring_time_ms_ = millis();
     }
 
     void setToCalibrationMode() {
@@ -189,8 +226,12 @@ class PneumaticLoadCell {
     pca9570* status_led_ = nullptr; // Pointer to status LED object
     SensorStatus status_ = OK; // Current status of the sensor
     uint8_t last_led_state_ = LED_OFF; // Track last LED state to avoid redundant writes
+
     boolean hardware_reset_triggered_ = false;
     unsigned long last_reset_time_ms_ = 0; // Timestamp of the last reset for timeout handling
+
+    boolean taring_triggered_ = false;
+    unsigned long last_taring_time_ms_ = 0; // Timestamp of the last taring for timeout handling
 
     float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
