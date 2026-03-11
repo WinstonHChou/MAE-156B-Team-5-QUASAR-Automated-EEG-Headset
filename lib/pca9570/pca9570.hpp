@@ -13,12 +13,14 @@
 
 class pca9570 {
   public:
-    pca9570() : wire_(nullptr) {}
+    pca9570() : wire_(nullptr), output_shadow_(PCA9570_PIN_MASK) {}
 
     bool begin(TwoWire& wire = Wire) {
       wire_ = &wire;
-      Wire.beginTransmission(PCA9570_SLAVE_ADDRESS);
-      if (Wire.endTransmission() == 0) {
+      wire_->beginTransmission(PCA9570_SLAVE_ADDRESS);
+      if (wire_->endTransmission() == 0) {
+        // Default all pins HIGH to keep active-low LEDs off and reset de-asserted.
+        writeOutput(output_shadow_);
         return true;
       }
       return false; // Initialization failed
@@ -44,13 +46,12 @@ class pca9570 {
 
     void digitalWrite(uint8_t pin, uint8_t value) {
       if (pin >= PCA9570_PINS_COUNT) return; // Invalid pin number
-      uint8_t current_out = readOutput();
       if (value == HIGH) {
-        current_out |= (1 << pin);  // Set bit to drive high
+        output_shadow_ |= (1 << pin);  // Set bit to drive high
       } else {
-        current_out &= ~(1 << pin); // Clear bit to drive low
+        output_shadow_ &= ~(1 << pin); // Clear bit to drive low
       }
-      writeOutput(current_out & PCA9570_PIN_MASK);
+      writeOutput(output_shadow_ & PCA9570_PIN_MASK);
     }
 
     int digitalRead(uint8_t pin) {
@@ -61,4 +62,5 @@ class pca9570 {
 
   private:
     TwoWire* wire_;
+    uint8_t output_shadow_;
 };
