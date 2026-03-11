@@ -86,13 +86,13 @@ enum ErrorCode : uint8_t {
  * @var flags
  *      Bitmask for control flags (see ControlFlags enum)
  * @var error_code
- *      Optional error code (0 = no error)
+ *      Optional error code (0 = no error, non-zero for specific errors)
  */
 typedef struct __attribute__((packed)) {
     uint8_t sensor_idx;
     RequestType request_idx;    // request type
     uint8_t flags;              // bitmask: ACK/BUSY/ERR
-    uint8_t error_code;         // optional: 0 = none
+    uint8_t error_code;         // optional: 0 = none, non-zero = specific error
     uint32_t payload;
 } ControlPacket;
 
