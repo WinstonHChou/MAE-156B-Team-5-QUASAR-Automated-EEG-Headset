@@ -62,6 +62,14 @@ def controlRequestThread(bridge: SerialBridge):
         pkt.flags = raw_byte_array[2]
         pkt.error_code = raw_byte_array[3]
         pkt.payload = 0
+        if pkt.request_idx == RequestType.REQUEST_CALIBRATION_END.value:
+            while True:
+                ratio_input = input("Enter the calibration ratio (a floating-point number): ")
+                try:
+                    pkt.payload = float(ratio_input)
+                    break
+                except ValueError:
+                    print("Invalid input. Please enter a valid floating-point number.")
         bridge.send(pkt)
 
         print(f"Sending Control Packet - Sensor Index: {pkt.sensor_idx}, Request Type: {RequestType(pkt.request_idx).name}")

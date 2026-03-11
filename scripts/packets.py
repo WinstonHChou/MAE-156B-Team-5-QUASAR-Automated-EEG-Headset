@@ -43,7 +43,7 @@ class ControlPacket(Packet):
         self.request_idx = RequestType.REQUEST_TARING
         self.flags = 0
         self.error_code = ErrorCode.ERR_NONE
-        self.payload = 0
+        self.payload = float(0.0)
 
     def serialize(self, link):
         sendSize = 0
@@ -51,7 +51,7 @@ class ControlPacket(Packet):
         sendSize = link.tx_obj(self.request_idx, start_pos=sendSize, val_type_override='B')
         sendSize = link.tx_obj(self.flags, start_pos=sendSize, val_type_override='B')
         sendSize = link.tx_obj(self.error_code, start_pos=sendSize, val_type_override='B')
-        sendSize = link.tx_obj(self.payload, start_pos=sendSize, val_type_override='l')
+        sendSize = link.tx_obj(self.payload, start_pos=sendSize, val_type_override='f')
         return sendSize
     
     def deserialize(self, link):
@@ -64,7 +64,7 @@ class ControlPacket(Packet):
         recSize += STRUCT_FORMAT_LENGTHS['B']
         self.error_code = link.rx_obj(obj_type='B', start_pos=recSize)
         recSize += STRUCT_FORMAT_LENGTHS['B']
-        self.payload = link.rx_obj(obj_type='l', start_pos=recSize)
+        self.payload = link.rx_obj(obj_type='f', start_pos=recSize)
 
 class SensorPacket(Packet):
     def __init__(self):

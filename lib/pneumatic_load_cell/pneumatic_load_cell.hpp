@@ -160,6 +160,10 @@ class PneumaticLoadCell {
       status_ = OK;
     }
 
+    void setRatio(float ratio) {
+      ratio_ = ratio;
+    }
+
     void resetHardware() {
       if (status_led_ && status_led_->digitalRead(GPIO_HARDWARE_RESET_PIN) == HIGH) {
         status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, LOW); // Assert reset
