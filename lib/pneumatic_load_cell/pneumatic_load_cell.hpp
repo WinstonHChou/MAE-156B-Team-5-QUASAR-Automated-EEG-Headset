@@ -201,7 +201,7 @@ class PneumaticLoadCell {
       ratio_ = ratio;
     }
 
-    void resetHardware() {
+    bool resetHardware() {
       if (status_led_ && status_led_->digitalRead(GPIO_HARDWARE_RESET_PIN) == HIGH) {
         status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, LOW); // Assert reset
         status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_ON); // Indicate hardware reset in progress
@@ -209,6 +209,7 @@ class PneumaticLoadCell {
         status_ = FAILURE; // Set status to FAILURE during reset
         last_reset_time_ms_ = millis();
       }
+      return hardware_reset_triggered_;
     }
 
     static void updateAmbientPressure(float ambient_kPa) {

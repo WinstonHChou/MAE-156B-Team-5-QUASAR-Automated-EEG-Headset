@@ -68,6 +68,7 @@ void loop() {
         if (load_cells[pkt.sensor_idx]->getStatus() != PneumaticLoadCell::OK) {
           pkt.flags |= CTRL_ERR; // Cannot perform zero load reset if sensor is not in OK status
           pkt.error_code = ERR_INVALID_REQUEST;
+          break;
         }
         load_cells[pkt.sensor_idx]->resetZeroLoad();
         break;
@@ -95,8 +96,12 @@ void loop() {
           pkt.error_code = ERR_INVALID_REQUEST;
           break;
         }
-        load_cells[pkt.sensor_idx]->resetHardware();
-      break;
+
+        if (!load_cells[pkt.sensor_idx]->resetHardware()) {
+          pkt.flags |= CTRL_ERR;  // Failed to initiate hardware reset
+          pkt.error_code = ERR_INVALID_REQUEST;
+        }
+        break;
       default:
         pkt.flags |= CTRL_ERR; // Invalid request type
         pkt.error_code = ERR_INVALID_REQUEST;
@@ -143,15 +148,14 @@ void loop() {
     delay(WAIT_FOR_CONVERSION_TIME_MS);
 
     // STEP 3: Read ambient pressure from the designated sensor for drift compensation
-    if (AMBIENT_PRESSURE_SENSOR_IDX < NUM_OF_SENSOR_SLOTS && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]) {
+    if (AMBIENT_PRESSURE_SENSOR_IDX < NUM_OF_SENSOR_SLOTS
+        && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]
+        && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getStatus() != PneumaticLoadCell::FAILURE) {
       if (load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress() != prev_mux_addr) {
         tcadisable(prev_mux_addr);
         prev_mux_addr = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress();
       }
       load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->update(); // Update to get the latest reading
-
-      // Keep calling update() for FAILURE sensors so LED/reset state can progress,
-      // but do not stream stale measurement data.
 
       float ambient_kPa = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getPressure();
       PneumaticLoadCell::updateAmbientPressure(ambient_kPa); // Update ambient pressure for drift compensation

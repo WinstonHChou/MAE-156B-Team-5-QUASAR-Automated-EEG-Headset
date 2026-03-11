@@ -58,7 +58,7 @@ def controlRequestThread(bridge: SerialBridge):
         raw_byte_array = bytes([number, RequestType[request_mask].value, 0, 0])  # sensor_idx, request_idx, flags, error_code
         pkt = ControlPacket()
         pkt.sensor_idx = raw_byte_array[0]
-        pkt.request_idx = pkt.flags = raw_byte_array[1]
+        pkt.request_idx = raw_byte_array[1]
         pkt.flags = raw_byte_array[2]
         pkt.error_code = raw_byte_array[3]
         pkt.payload = 0
