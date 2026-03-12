@@ -21,8 +21,8 @@
 constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
 #define NUM_OF_SENSOR_SLOTS (sizeof(TCAADDR_ADDRESSES) / sizeof(TCAADDR_ADDRESSES[0]) * 8)
 
-// 4. Timing & Filtering (30 ms = ~33 Hz; loop often ~26 ms with many sensors, so 20 ms caused overruns)
-#define MPRLS_SAMPLING_INTERVAL_MS   30
+// 4. Timing & Filtering
+#define MPRLS_SAMPLING_INTERVAL_MS   20
 #define MPRLS_SAMPLING_RATE_HZ       (1000.0f / MPRLS_SAMPLING_INTERVAL_MS)
 #define READING_TIMEOUT              10
 #define HARDWARE_RESET_TIMEOUT_MS    1000 // Timeout for hardware reset in milliseconds
