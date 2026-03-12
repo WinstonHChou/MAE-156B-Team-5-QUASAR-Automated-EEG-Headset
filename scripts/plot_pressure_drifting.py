@@ -44,7 +44,7 @@ def main():
     line_sim = None
     if second_csv_path:
         (line2,) = ax.plot([], [], linewidth=2, color="tab:orange", label="Ambient Pressure (kPa)")
-        (line_est,) = ax.plot([], [], linewidth=2, color="tab:purple", linestyle=":", label="Estimated Pressure (kPa)")
+        (line_est,) = ax.plot([], [], linewidth=2, color="tab:purple", linestyle=":", label="Corrected Pressure (kPa)")
         if ENABLE_SIM:
             (line_sim,) = ax.plot([], [], linewidth=2, color="tab:green", linestyle="--", label="Air Diffusion Model (kPa)")
 
