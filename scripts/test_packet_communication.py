@@ -9,7 +9,7 @@ import threading
 import cutie
 
 
-BAUD = 115200
+BAUD = 921600
 
 def terminal_menu(choices, title="Select an option"):
     choices_with_caption = [title] + [str(c) for c in choices]
