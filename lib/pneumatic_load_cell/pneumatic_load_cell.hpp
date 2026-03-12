@@ -175,8 +175,8 @@ class PneumaticLoadCell {
       }
       is_even_sample_ = !is_even_sample_; // Toggle sample parity
 
-      float estimated_pressure_kPa_ = current_kPa_ + accumulated_drift_kPa_;
-      current_force_g_ = (estimated_pressure_kPa_ - zero_kPa_) * ratio_;  // in grams
+      float corrected_pressure_kPa_ = current_kPa_ + accumulated_drift_kPa_;
+      current_force_g_ = (corrected_pressure_kPa_ - zero_kPa_) * ratio_;  // in grams
     }
 
     float getPressure() {
