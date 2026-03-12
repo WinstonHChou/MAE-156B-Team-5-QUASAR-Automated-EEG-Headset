@@ -82,7 +82,6 @@ void loop() {
           break;
         }
         load_cells[pkt.sensor_idx]->setRatio(static_cast<float>(pkt.payload));            // End calibration mode to save the new ratio
-        load_cells[pkt.sensor_idx]->resetZeroLoad();                                      // After calibration, reset zero load to update the reference
         load_cells[pkt.sensor_idx]->setToNormalMode();
         break;
       case REQUEST_HARDWARE_RESET:

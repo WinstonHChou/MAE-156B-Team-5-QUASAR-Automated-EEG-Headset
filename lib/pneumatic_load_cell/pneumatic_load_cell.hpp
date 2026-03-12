@@ -155,11 +155,26 @@ class PneumaticLoadCell {
         zero_kPa_ = current_kPa_;
         prev_kPa_ = current_kPa_;      // Reset previous reading to avoid large spikes
         accumulated_drift_kPa_ = 0.0f; // Reset accumulated drift when zero load is reset
+        is_even_sample_ = true; // Reset sample count for Simpson's rule
       }
 
       // Estimator pipeline: exponential decay model for drift compensation
-      accumulated_drift_kPa_ +=
-          (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (current_timestamp_ms_ - last_timestamp_ms_) / 1000.0f;
+      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
+        // option 1: Right Riemann sum approximation of the integral of the pressure difference over time
+        // accumulated_drift_kPa_ +=
+        //     (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (current_timestamp_ms_ - last_timestamp_ms_) / 1000.0f;
+
+        // option 2: Simpson's 1/3 rule approximation of the integral, which can be more accurate with fewer samples, but requires storing one more previous reading
+        if (is_even_sample_) {
+          accumulated_drift_kPa_ +=
+              (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (MPRLS_SAMPLING_INTERVAL_MS / 1000.0f) / 3.0f * 4; // Odd samples get quadruple weight in Simpson's rule
+        } else {
+          accumulated_drift_kPa_ +=
+              (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (MPRLS_SAMPLING_INTERVAL_MS / 1000.0f) / 3.0f * 2; // Even samples get double weight in Simpson's rule
+        }
+      }
+      is_even_sample_ = !is_even_sample_; // Toggle sample parity
+
       float estimated_pressure_kPa_ = current_kPa_ + accumulated_drift_kPa_;
       current_force_g_ = (estimated_pressure_kPa_ - zero_kPa_) * ratio_;  // in grams
     }
@@ -240,6 +255,7 @@ class PneumaticLoadCell {
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
     inline static float ambient_kPa_ = DEFAULT_AMBIENT_PRESSURE_KPA; // Ambient pressure for reference (kPa)
     float accumulated_drift_kPa_ = 0.0; // Accumulated drift in pressure (kPa) for compensation
+    boolean is_even_sample_ = true; // Flag to track even/odd samples for Simpson's rule
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
     unsigned long current_timestamp_ms_ = 0; // Timestamp of the current reading for rate calculation
     unsigned long last_timestamp_ms_ = 0;  // Timestamp of the last reading for rate calculation
