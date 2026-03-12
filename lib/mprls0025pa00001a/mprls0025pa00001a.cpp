@@ -136,7 +136,9 @@ uint32_t mprls0025pa00001a::readData(uint8_t* buffer) {
   }
 
   // Read status byte and data
-  i2c_dev->read(buffer, 4);
+  if (!i2c_dev->read(buffer, 4)) {
+    return 0xFFFFFFFF;
+  }
 
   // check status byte
   if (buffer[0] & MPRLS_STATUS_MATHSAT) {
@@ -159,6 +161,8 @@ uint32_t mprls0025pa00001a::readData(uint8_t* buffer) {
 /**************************************************************************/
 uint8_t mprls0025pa00001a::readStatus(void) {
   uint8_t buffer[1];
-  i2c_dev->read(buffer, 1);
+  if (!i2c_dev->read(buffer, 1)) {
+    return MPRLS_STATUS_BUSY;
+  }
   return buffer[0];
 }
