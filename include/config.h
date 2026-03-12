@@ -14,15 +14,15 @@
 #define I2C_FAST_MODE_CLOCK_FREQ 400000L
 
 #define I2C_CLOCK_FREQ I2C_FAST_MODE_CLOCK_FREQ
-#define BRIDGE_BAUDRATE 115200
+#define BRIDGE_BAUDRATE 921600  // need headroom for 13+ sensor packets per cycle (was 460800; 13th sensor still dropped)
 #define WAIT_FOR_CONVERSION_TIME_MS 5   // Longest sensor conversion time (typically 5ms)
 
 // 3. The Addressing Logic
 constexpr uint8_t TCAADDR_ADDRESSES[] = {0x70, 0x71, 0x72, 0x73};
 #define NUM_OF_SENSOR_SLOTS (sizeof(TCAADDR_ADDRESSES) / sizeof(TCAADDR_ADDRESSES[0]) * 8)
 
-// 4. Timing & Filtering
-#define MPRLS_SAMPLING_INTERVAL_MS   20
+// 4. Timing & Filtering (30 ms = ~33 Hz; loop often ~26 ms with many sensors, so 20 ms caused overruns)
+#define MPRLS_SAMPLING_INTERVAL_MS   30
 #define MPRLS_SAMPLING_RATE_HZ       (1000.0f / MPRLS_SAMPLING_INTERVAL_MS)
 #define READING_TIMEOUT              10
 #define HARDWARE_RESET_TIMEOUT_MS    1000 // Timeout for hardware reset in milliseconds
