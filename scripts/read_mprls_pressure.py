@@ -16,7 +16,7 @@ from packets import PacketID, ControlFlags, RequestType, ControlPacket, SensorPa
 import matplotlib.pyplot as plt
 import argparse
 
-BAUD = 115200
+BAUD = 921600
 
 
 def autodetect_port():

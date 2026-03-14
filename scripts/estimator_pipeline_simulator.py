@@ -40,6 +40,7 @@ class LowpassFilter:
         y = signal.filtfilt(self.b, self.a, data)
         return y
 
+@DeprecationWarning
 class EstimatorPipelineSimulator:
     """
     Simulates the estimator pipeline by applying a moving average filter to the input pressure data.

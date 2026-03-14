@@ -58,9 +58,11 @@ enum ControlFlags : uint8_t {
 };
 
 enum RequestType : uint8_t {
-    REQUEST_RESET_ZERO_LOAD     = 0x00,
+    REQUEST_TARING              = 0x00,
     REQUEST_CALIBRATION_START   = 0x01,
     REQUEST_CALIBRATION_END     = 0x02,
+    REQUEST_HARDWARE_RESET      = 0x03,
+    // add more request types as needed
 };
 
 enum ErrorCode : uint8_t {
@@ -84,14 +86,14 @@ enum ErrorCode : uint8_t {
  * @var flags
  *      Bitmask for control flags (see ControlFlags enum)
  * @var error_code
- *      Optional error code (0 = no error)
+ *      Optional error code (0 = no error, non-zero for specific errors)
  */
 typedef struct __attribute__((packed)) {
     uint8_t sensor_idx;
     RequestType request_idx;    // request type
     uint8_t flags;              // bitmask: ACK/BUSY/ERR
-    uint8_t error_code;         // optional: 0 = none
-    uint32_t payload;
+    uint8_t error_code;         // optional: 0 = none, non-zero = specific error
+    float payload;
 } ControlPacket;
 
 

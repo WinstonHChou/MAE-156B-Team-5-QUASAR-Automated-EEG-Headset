@@ -64,19 +64,46 @@ void loop() {
   if (bridge.receive(pkt) && pkt.sensor_idx < NUM_OF_SENSOR_SLOTS && load_cells[pkt.sensor_idx]) {
 
     switch (pkt.request_idx) {
-      case REQUEST_RESET_ZERO_LOAD:
-        if (load_cells[pkt.sensor_idx]->getStatus() == PneumaticLoadCell::OK) {
-          load_cells[pkt.sensor_idx]->resetZeroLoad();
-        } else {
+      case REQUEST_TARING:
+        if (load_cells[pkt.sensor_idx]->getStatus() != PneumaticLoadCell::OK) {
           pkt.flags |= CTRL_ERR; // Cannot perform zero load reset if sensor is not in OK status
           pkt.error_code = ERR_INVALID_REQUEST;
+          break;
         }
+        load_cells[pkt.sensor_idx]->resetZeroLoad();
         break;
       case REQUEST_CALIBRATION_START:
         load_cells[pkt.sensor_idx]->setToCalibrationMode();
         break;
       case REQUEST_CALIBRATION_END:
+        if (load_cells[pkt.sensor_idx]->getStatus() != PneumaticLoadCell::BUSY) {
+          pkt.flags |= CTRL_ERR;  // Cannot accept calibration end request if sensor is not currently in BUSY (calibration) status
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
+        load_cells[pkt.sensor_idx]->setRatio(static_cast<float>(pkt.payload));            // End calibration mode to save the new ratio
         load_cells[pkt.sensor_idx]->setToNormalMode();
+        break;
+      case REQUEST_HARDWARE_RESET:
+        if (load_cells[pkt.sensor_idx]->isHardwareResetInProgress()) {
+          pkt.flags |= CTRL_ERR;  // Cannot accept hardware reset request if a hardware reset is already in progress
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
+        if (pkt.sensor_idx == AMBIENT_PRESSURE_SENSOR_IDX) {
+          pkt.flags |= CTRL_ERR;  // Reject hardware reset requests for the ambient pressure sensor, as it's critical for drift compensation and should not be reset by user commands
+          pkt.error_code = ERR_INVALID_REQUEST;
+          break;
+        }
+
+        if (!load_cells[pkt.sensor_idx]->resetHardware()) {
+          pkt.flags |= CTRL_ERR;  // Failed to initiate hardware reset
+          pkt.error_code = ERR_INVALID_REQUEST;
+        }
+        break;
+      default:
+        pkt.flags |= CTRL_ERR; // Invalid request type
+        pkt.error_code = ERR_INVALID_REQUEST;
         break;
     }
 
@@ -92,6 +119,8 @@ void loop() {
         pkt.flags |= CTRL_ERR;
         pkt.error_code = ERR_SENSOR_FAILURE;
         break;
+      default:
+        break;
     }
 
     bridge.send(pkt); // Echo back the received control packet for confirmation
@@ -103,54 +132,88 @@ void loop() {
 
     // STEP 1: Broadcast "Start" to all sensors
     for (auto& sensor : load_cells) {
-      if (sensor) {
-        if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(prev_mux_addr);
-          prev_mux_addr = sensor->getMuxAddress();
-        }
-        sensor->requestMeasurement();
+      if (!sensor) continue; // Skip if sensor is not initialized
+      if (sensor->getStatus() == PneumaticLoadCell::FAILURE) continue; // Skip if sensor is in FAILURE status, likely due to hardware reset
+
+      if (sensor->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = sensor->getMuxAddress();
       }
+      sensor->requestMeasurement();
     }
 
-    // STEP 2: Wait once for the longest conversion time (typ 5ms)
+    // STEP 2: Wait once for the longest conversion time (typically 5ms)
     // During this time, every sensor is busy-calculating pressure.
-    delay(5);
+    delay(WAIT_FOR_CONVERSION_TIME_MS);
 
-    // STEP 3: Collect data and send via SerialTransfer
-    for (auto& sensor : load_cells) {
-      if (sensor) {
-        if (sensor->getMuxAddress() != prev_mux_addr) {
-          tcadisable(prev_mux_addr);
-          prev_mux_addr = sensor->getMuxAddress();
-        }
-        // periodic update of sensor readings;
-        sensor->update();
-
-        // Read data
-        float pressure_kPa = sensor->getPressure();
-        float F_g = sensor->getForceFromPressure();
-        float pressure_rate = sensor->getPressureRate();
-
-        // Debug Serial Logging
-        #ifdef DEBUG_SERIAL
-        Serial.println();
-        Serial.print(">");
-        Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
-        Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
-        Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
-        Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
-        Serial.println();
-        #endif
-
-        // Send via SerialBridge
-        SensorPacket pkt = {};
-        pkt.sensor_idx = sensor->getSensorIndex();
-        pkt.sensor_pressure_kPa = pressure_kPa;
-        pkt.sensor_pressure_rate_kPa_s = pressure_rate;
-        pkt.sensor_force_g = F_g;
-
-        bridge.send(pkt);
+    // STEP 3: Read ambient pressure from the designated sensor for drift compensation
+    if (AMBIENT_PRESSURE_SENSOR_IDX < NUM_OF_SENSOR_SLOTS
+        && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]
+        && load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getStatus() != PneumaticLoadCell::FAILURE) {
+      if (load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getMuxAddress();
       }
+      load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->update(); // Update to get the latest reading
+
+      float ambient_kPa = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getPressure();
+      PneumaticLoadCell::updateAmbientPressure(ambient_kPa); // Update ambient pressure for drift compensation
+
+      // Send via SerialBridge
+      SensorPacket amb_sensor_pkt = {};
+      amb_sensor_pkt.sensor_idx = load_cells[AMBIENT_PRESSURE_SENSOR_IDX]->getSensorIndex();
+      amb_sensor_pkt.sensor_pressure_kPa = ambient_kPa;
+      amb_sensor_pkt.sensor_pressure_rate_kPa_s = 0.0f;
+      amb_sensor_pkt.sensor_force_g = 0.0f;
+
+      bridge.send(amb_sensor_pkt);
+    } else {
+      // If ambient pressure sensor is not available, use DEFAULT_AMBIENT_PRESSURE_KPA
+      PneumaticLoadCell::updateAmbientPressure(DEFAULT_AMBIENT_PRESSURE_KPA);
+    }
+
+    // STEP 4: Collect data and send via SerialTransfer
+    for (auto& sensor : load_cells) {
+      if (!sensor) continue; // Skip if sensor is not initialized
+
+      // Skip sending data for ambient pressure sensor, it's only used for drift compensation
+      if (sensor->getSensorIndex() == AMBIENT_PRESSURE_SENSOR_IDX) continue;
+
+      if (sensor->getMuxAddress() != prev_mux_addr) {
+        tcadisable(prev_mux_addr);
+        prev_mux_addr = sensor->getMuxAddress();
+      }
+      // periodic update of sensor readings;
+      sensor->update();
+
+      // Keep calling update() for FAILURE sensors so LED/reset state can progress,
+      // but do not stream stale measurement data.
+      if (sensor->getStatus() == PneumaticLoadCell::FAILURE && !sensor->isHardwareResetInProgress()) continue;
+
+      // Read data
+      float pressure_kPa = sensor->getPressure();
+      float F_g = sensor->getForceFromPressure();
+      float pressure_rate = sensor->getPressureRate();
+
+      // Debug Serial Logging
+      #ifdef DEBUG_SERIAL
+      Serial.println();
+      Serial.print(">");
+      Serial.print("Pressure_kPa_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa, 4);
+      Serial.print(",Pressure_PSI_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_kPa / PSI_to_KPA, 4);
+      Serial.print(",Detected_weight_g_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(F_g, 4);
+      Serial.print(",Pressure_rate_kPa_s_"); Serial.print(sensor->getSensorIndex()); Serial.print(":"); Serial.print(pressure_rate, 4);
+      Serial.println();
+      #endif
+
+      // Send via SerialBridge
+      SensorPacket pkt = {};
+      pkt.sensor_idx = sensor->getSensorIndex();
+      pkt.sensor_pressure_kPa = pressure_kPa;
+      pkt.sensor_pressure_rate_kPa_s = pressure_rate;
+      pkt.sensor_force_g = F_g;
+
+      bridge.send(pkt);
     }
 
     unsigned long loop_time = millis() - lastMillis;

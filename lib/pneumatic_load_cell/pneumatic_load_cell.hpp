@@ -13,26 +13,15 @@
 #define MPRLS_ADDR MPRLS_DEFAULT_ADDR
 #define PSI_to_KPA (6.8947572932f)   ///< Constant: PSI to KPA conversion factor
 
-#define LED_ON          LOW   // for active-low wiring
-#define LED_OFF         HIGH
-#define LED_STATUS_PIN  1  // Status LED on sensor breakout board (P1)
+#define GPIO_HARDWARE_RESET_PIN       0         // GPIO pin for hardware reset control (if needed)
 
-double interp_clamp(const std::map<double,double>& m, double x) {
-  if (m.empty()) return std::numeric_limits<double>::quiet_NaN();
+#define LED_ON                        LOW       // for active-low wiring
+#define LED_OFF                       HIGH
+#define LED_STATUS_PIN                1         // Status LED on sensor breakout board (P1)
+#define LED_TARING_STATUS_PIN         2         // Taring status LED on sensor breakout board (P2)
+#define LED_HARDWARE_RESET_STATUS_PIN 3         // Hardware reset indicator LED on breakout board (P3)
+#define LED_BLINK_INTERVAL_MS         500       // Interval for blinking the LED in busy status
 
-  auto hi = m.lower_bound(x);                 // first key >= x
-
-  if (hi == m.begin()) return hi->second;     // x <= first key (clamp)
-  if (hi == m.end())   return std::prev(hi)->second; // x > last key (clamp)
-
-  auto lo = std::prev(hi);                    // key < x
-
-  const double x0 = lo->first, y0 = lo->second;
-  const double x1 = hi->first, y1 = hi->second;
-
-  const double t = (x - x0) / (x1 - x0);
-  return y0 + t * (y1 - y0);
-}
 
 // Pneumatic Load Cell
 class PneumaticLoadCell {
@@ -64,6 +53,10 @@ class PneumaticLoadCell {
       return status_;
     }
 
+    bool isHardwareResetInProgress() const {
+      return hardware_reset_triggered_;
+    }
+
     // Read pressure from the sensor
     boolean begin() {
       tcaselect(ch_, mux_);
@@ -83,16 +76,8 @@ class PneumaticLoadCell {
       return true;
     }
 
-    // End communication with the sensor (if needed)
-    void end() {
-      tcadisable(mux_);
-      if (status_led_) {
-        delete status_led_;
-        status_led_ = nullptr;
-      }
-    }
-
     void requestMeasurement() {
+      if (hardware_reset_triggered_) return; // If hardware reset is active, skip requesting measurement
       tcaselect(ch_, mux_);
       sensor_.requestData();
     }
@@ -112,7 +97,7 @@ class PneumaticLoadCell {
             break;
           case BUSY:
             // Blink the LED to indicate busy status
-            desired_led_state = (millis() / 500) % 2 == 0 ? LED_ON : LED_OFF;
+            desired_led_state = (millis() / LED_BLINK_INTERVAL_MS) % 2 == 0 ? LED_ON : LED_OFF;
             break;
           case FAILURE:
             desired_led_state = LED_OFF;
@@ -124,20 +109,74 @@ class PneumaticLoadCell {
         }
       }
 
-      // sensor_.readPressure() is a BLOCKING call (approx 5-8ms)
-      const uint32_t& raw_val = sensor_.readData(buffer_);
-      current_kPa_ = lp_.filter(sensor_.convertToPressure(raw_val));
+      // If sensor is in terminal failure state, avoid repeated I2C reads that can stall the loop.
+      if (status_ == FAILURE && !hardware_reset_triggered_) {
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      // Always short-circuit while reset is in progress, even if the LED expander is unavailable.
+      if (hardware_reset_triggered_) {
+        if (millis() - last_reset_time_ms_ > HARDWARE_RESET_TIMEOUT_MS) {
+          if (status_led_) {
+            status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, HIGH); // De-assert reset
+            status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_OFF); // Indicate hardware reset is ended
+          }
+          hardware_reset_triggered_ = false;
+          status_ = OK;
+        }
+        current_timestamp_ms_ = millis();
+        return; // Skip the rest of update while hardware reset is active
+      }
+
+      // Read raw pressure data from the sensor
+      const uint32_t raw_val = sensor_.readData(buffer_);
+      if (raw_val == 0xFFFFFFFF) {
+        status_ = FAILURE;
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      const float pressure_kPa = sensor_.convertToPressure(raw_val);
+      if (isnan(pressure_kPa)) {
+        status_ = FAILURE;
+        current_timestamp_ms_ = millis();
+        return;
+      }
+
+      current_kPa_ = lp_.filter(pressure_kPa);
       current_timestamp_ms_ = millis();
 
-      // Estimator pipeline: only update force reading if pressure rate is above threshold to filter out drifts;
-      // otherwise calculate drifting compensated zero load pressure
-      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
-        // Update force reading only if pressure rate is above threshold to filter out drifts
-        current_force_g_ = (current_kPa_ - zero_kPa_) * ratio_;  // in grams
-      } else {
-        // Calculate drifting compensated zero load pressure
-        zero_kPa_ = current_kPa_ - (current_force_g_ / ratio_);
+      if (taring_triggered_ && millis() - last_taring_time_ms_ > TARING_TIMEOUT_MS) {
+        if (status_led_) {
+          status_led_->digitalWrite(LED_TARING_STATUS_PIN, LED_OFF); // Indicate taring is completed
+        }
+        taring_triggered_ = false;
+        zero_kPa_ = current_kPa_;
+        prev_kPa_ = current_kPa_;      // Reset previous reading to avoid large spikes
+        accumulated_drift_kPa_ = 0.0f; // Reset accumulated drift when zero load is reset
+        is_even_sample_ = true; // Reset sample count for Simpson's rule
       }
+
+      // Estimator pipeline: exponential decay model for drift compensation
+      if (abs(getPressureRate()) > MIN_ACCEPTABLE_PRESSURE_RATE_THRESHOLD_KPA_S) {
+        // option 1: Right Riemann sum approximation of the integral of the pressure difference over time
+        // accumulated_drift_kPa_ +=
+        //     (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (current_timestamp_ms_ - last_timestamp_ms_) / 1000.0f;
+
+        // option 2: Simpson's 1/3 rule approximation of the integral, which can be more accurate with fewer samples, but requires storing one more previous reading
+        if (is_even_sample_) {
+          accumulated_drift_kPa_ +=
+              (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (MPRLS_SAMPLING_INTERVAL_MS / 1000.0f) / 3.0f * 4; // Odd samples get quadruple weight in Simpson's rule
+        } else {
+          accumulated_drift_kPa_ +=
+              (1 / DRIFT_TIME_CONSTANT_S) * (current_kPa_ - ambient_kPa_) * (MPRLS_SAMPLING_INTERVAL_MS / 1000.0f) / 3.0f * 2; // Even samples get double weight in Simpson's rule
+        }
+      }
+      is_even_sample_ = !is_even_sample_; // Toggle sample parity
+
+      float corrected_pressure_kPa_ = current_kPa_ + accumulated_drift_kPa_;
+      current_force_g_ = (corrected_pressure_kPa_ - zero_kPa_) * ratio_;  // in grams
     }
 
     float getPressure() {
@@ -158,11 +197,11 @@ class PneumaticLoadCell {
 
     // Calibration procedure
     void resetZeroLoad() {
-      requestMeasurement();
-      delay(5); // Wait for the sensor to finish
-      // readData needs a buffer; we can use the class member buffer_
-      uint32_t raw = sensor_.readData(buffer_); 
-      zero_kPa_ = sensor_.convertToPressure(raw);
+      if (status_led_) {
+        status_led_->digitalWrite(LED_TARING_STATUS_PIN, LED_ON); // Indicate taring in progress
+      }
+      taring_triggered_ = true;
+      last_taring_time_ms_ = millis();
     }
 
     void setToCalibrationMode() {
@@ -171,6 +210,25 @@ class PneumaticLoadCell {
 
     void setToNormalMode() {
       status_ = OK;
+    }
+
+    void setRatio(float ratio) {
+      ratio_ = ratio;
+    }
+
+    bool resetHardware() {
+      if (status_led_ && status_led_->digitalRead(GPIO_HARDWARE_RESET_PIN) == HIGH) {
+        status_led_->digitalWrite(GPIO_HARDWARE_RESET_PIN, LOW); // Assert reset
+        status_led_->digitalWrite(LED_HARDWARE_RESET_STATUS_PIN, LED_ON); // Indicate hardware reset in progress
+        hardware_reset_triggered_ = true;
+        status_ = FAILURE; // Set status to FAILURE during reset
+        last_reset_time_ms_ = millis();
+      }
+      return hardware_reset_triggered_;
+    }
+
+    static void updateAmbientPressure(float ambient_kPa) {
+      ambient_kPa_ = ambient_kPa;
     }
 
   private:
@@ -184,13 +242,21 @@ class PneumaticLoadCell {
     pca9570* status_led_ = nullptr; // Pointer to status LED object
     SensorStatus status_ = OK; // Current status of the sensor
     uint8_t last_led_state_ = LED_OFF; // Track last LED state to avoid redundant writes
-    // std::map<double, double> calibration_map_; // Map of <pressure (kPa), force (grams)>
+
+    boolean hardware_reset_triggered_ = false;
+    unsigned long last_reset_time_ms_ = 0; // Timestamp of the last reset for timeout handling
+
+    boolean taring_triggered_ = false;
+    unsigned long last_taring_time_ms_ = 0; // Timestamp of the last taring for timeout handling
 
     float prev_kPa_ = 0.0;    // Previous pressure reading (kPa)
     float current_kPa_ = 0.0; // Latest pressure reading (kPa)
     float current_force_g_ = 0.0; // Latest force reading (grams)
     float zero_kPa_ = 0.0; // Pressure at zero load (kPa)
+    inline static float ambient_kPa_ = DEFAULT_AMBIENT_PRESSURE_KPA; // Ambient pressure for reference (kPa)
+    float accumulated_drift_kPa_ = 0.0; // Accumulated drift in pressure (kPa) for compensation
+    boolean is_even_sample_ = true; // Flag to track even/odd samples for Simpson's rule
     float ratio_ = FORCE_TO_SENSOR_RATIO;    // Force-to-sensor ratio (grams/kPa)
-    unsigned long current_timestamp_ms_ = 0.0; // Timestamp of the current reading for rate calculation
-    unsigned long last_timestamp_ms_ = 0.0;  // Timestamp of the last reading for rate calculation
+    unsigned long current_timestamp_ms_ = 0; // Timestamp of the current reading for rate calculation
+    unsigned long last_timestamp_ms_ = 0;  // Timestamp of the last reading for rate calculation
 };
